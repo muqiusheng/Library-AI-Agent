@@ -1,11 +1,31 @@
 [project]
 name = "library-ai-agent"
 version = "0.1.0"
-description = "Add your description here"
+description = "BookPath AI - personalized library reading paths"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "alembic>=1.16.0",
+    "argon2-cffi>=25.1.0",
     "fastapi>=0.136.1",
+    "openai>=1.97.0",
+    "pydantic-settings>=2.10.0",
+    "psycopg[binary]>=3.2.0",
+    "pyjwt>=2.10.0",
+    "sqlalchemy>=2.0.41",
+    "uvicorn[standard]>=0.30.0",
+    "chromadb>=0.4.0",
+    "openpyxl>=3.1.5",
+    "pandas>=3.0.2",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.0",
+    "mypy>=1.17.0",
+    "pytest>=8.4.0",
+    "pytest-asyncio>=1.1.0",
+    "ruff>=0.12.0",
 ]
 
 [[tool.uv.index]]
@@ -15,5 +35,16 @@ default = true
 [tool.pyright]
 venvPath = "."
 venv = ".venv"
-include = ["backend"]
+include = ["app"]
 extraPaths = ["."]
+
+[tool.pytest.ini_options]
+testpaths = ["app/tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
