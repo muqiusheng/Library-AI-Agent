@@ -10,7 +10,11 @@ $root = Split-Path -Parent $PSScriptRoot
 $compose = Join-Path $root 'docker-compose.home.yml'
 
 if (-not $KeepFunnel -and (Test-Path -LiteralPath $TailscalePath)) {
-    & $TailscalePath funnel --https=443 off
+    $funnelStatus = (& $TailscalePath funnel status --json 2>$null) -join ''
+    if ($LASTEXITCODE -eq 0 -and $funnelStatus.Trim() -ne '{}') {
+        & $TailscalePath funnel reset
+        if ($LASTEXITCODE -ne 0) { throw 'Tailscale Funnel shutdown failed.' }
+    }
 }
 & $DockerPath compose -f $compose down
 if ($LASTEXITCODE -ne 0) { throw 'Docker Compose shutdown failed.' }

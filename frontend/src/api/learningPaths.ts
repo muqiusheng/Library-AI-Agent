@@ -28,3 +28,8 @@ export async function updatePathBook(id: string, bookId: string, state: BookStat
   const response = await apiClient.patch<ApiEnvelope<LearningPathData>>(`/learning-paths/${id}/books/${bookId}`, { state })
   return response.data.data
 }
+
+export async function completePathStage(id: string, stageId: string): Promise<LearningPathData> {
+  const response = await apiClient.patch<ApiEnvelope<LearningPathData>>(`/learning-paths/${id}/stages/${stageId}/complete`)
+  return response.data.data
+}

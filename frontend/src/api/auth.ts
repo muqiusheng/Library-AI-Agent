@@ -19,3 +19,15 @@ export async function getCurrentUser(): Promise<UserSummary> {
 export async function logout(): Promise<void> {
   await apiClient.post('/auth/logout')
 }
+
+export async function updateProfile(payload: { display_name?: string }): Promise<UserSummary> {
+  const response = await apiClient.put<ApiEnvelope<UserSummary>>('/auth/me', payload)
+  return response.data.data
+}
+
+export async function uploadAvatar(file: File): Promise<UserSummary> {
+  const formData = new FormData()
+  formData.append('file', file)
+  const response = await apiClient.post<ApiEnvelope<UserSummary>>('/auth/me/avatar', formData)
+  return response.data.data
+}

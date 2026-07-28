@@ -16,6 +16,7 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     student_no: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     display_name: Mapped[str | None] = mapped_column(String(100))
+    avatar_url: Mapped[str | None] = mapped_column(String(255))
     role: Mapped[UserRole] = mapped_column(
         Enum(UserRole, values_callable=enum_values, native_enum=False, length=16),
         default=UserRole.STUDENT,

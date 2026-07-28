@@ -5,8 +5,13 @@ from uuid import UUID
 
 import chromadb
 
+import threading
+
 from app.core.config import get_settings
 from app.integrations.embeddings.base import EmbeddingProvider
+
+_chroma_lock = threading.Lock()
+_shared_client = None
 
 
 @dataclass(frozen=True)
@@ -19,12 +24,17 @@ class ChromaVectorStore:
     def __init__(
         self, embedding_provider: EmbeddingProvider, persist_directory: Path | None = None
     ) -> None:
+        global _shared_client
         settings = get_settings()
         self.embedding_provider = embedding_provider
         self.persist_directory = persist_directory or settings.chroma_persist_directory
-        self.persist_directory.mkdir(parents=True, exist_ok=True)
-        self.client = chromadb.PersistentClient(path=str(self.persist_directory))
         self.prefix = settings.chroma_collection_prefix
+        
+        with _chroma_lock:
+            if _shared_client is None:
+                self.persist_directory.mkdir(parents=True, exist_ok=True)
+                _shared_client = chromadb.PersistentClient(path=str(self.persist_directory))
+            self.client = _shared_client
 
     def collection_name(self, data_version_id: UUID) -> str:
         prefix = re.sub(r"[^a-zA-Z0-9_-]", "_", self.prefix)[:24]

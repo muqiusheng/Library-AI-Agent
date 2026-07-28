@@ -5,6 +5,7 @@ import * as authApi from '@/api/auth'
 import type { LoginPayload, RegisterPayload, UserSummary } from '@/types/auth'
 import { getApiErrorMessage } from '@/utils/apiError'
 import { useProfileStore } from '@/stores/profile'
+import { useConversationStore } from '@/stores/conversation'
 
 const TOKEN_KEY = 'bookpath_access_token'
 
@@ -28,6 +29,7 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
     localStorage.removeItem(TOKEN_KEY)
     useProfileStore().clear()
+    useConversationStore().clear()
   }
 
   async function hydrate(): Promise<void> {

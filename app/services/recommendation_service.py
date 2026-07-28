@@ -5,6 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+import json
 
 from app.db.models import (
     Book,
@@ -56,6 +57,38 @@ class RecommendationService:
         self.library = library or LocalLibraryAdapter(session)
         self.llm = llm or DeepSeekProvider()
 
+    from collections.abc import AsyncIterator
+
+    async def stream_summary(self, recommendation_set: RecommendationSetRead, user: User) -> AsyncIterator[str]:
+        if not self.llm.available:
+            yield recommendation_set.summary
+            return
+            
+        profile_json = json.dumps(self._profile_snapshot(user), ensure_ascii=False) if user.profile else "{}"
+        books_info = ", ".join([f"《{item.title}》" for item in recommendation_set.items])
+        
+        system_prompt = (
+            "你是 BookPath AI 的馆藏推荐助手。根据以下信息，生成一段简短的推荐语（约 50-100 字）。"
+            "你需要说出推荐了多少本书，并给出一个总体的评价。请使用 Markdown 格式。"
+            "【特别提示】：请仔细对比用户的请求和用户的个人画像基础（foundation, major 等）。"
+            "如果用户请求的知识显然超出了他们现有的基础（例如没有 Python 基础但要求学 LangChain，或者没有数学基础要求学深度学习），"
+            "你必须在推荐语的**最后**，以友好的语气**委婉提醒**用户当前可能缺乏相关的基础知识，建议配合基础学习。"
+            "如果完全匹配或不需要提醒，则直接鼓励阅读。"
+        )
+        user_prompt = f"用户的请求：{recommendation_set.query}\n用户画像：{profile_json}\n推荐了：{books_info}，总计 {len(recommendation_set.items)} 本。"
+        
+        try:
+            async for chunk in self.llm.stream_chat(
+                [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.7
+            ):
+                yield chunk
+        except DeepSeekError:
+            yield recommendation_set.summary
+
     async def recommend(
         self,
         *,
@@ -65,6 +98,7 @@ class RecommendationService:
         only_available: bool = False,
         constraints: dict | None = None,
     ) -> RecommendationSetRead:
+        enriched_query = await self._enrich_query(query, user)
         constraint_values = {"only_available": only_available, **(constraints or {})}
         config = SystemConfigService(self.session)
         top_k = int(config.get("recommendation_top_k"))
@@ -89,7 +123,7 @@ class RecommendationService:
         excluded_terms = [
             str(value).casefold() for value in constraint_values.get("excluded_terms", [])
         ]
-        candidates = self.library.search_candidates(query, limit=50)
+        candidates = self.library.search_candidates(enriched_query, limit=50)
         candidates = [
             book
             for book in candidates
@@ -150,6 +184,37 @@ class RecommendationService:
             created_at=recommendation_set.created_at,
             items=cards,
         )
+
+    async def _enrich_query(self, query: str, user: User) -> str:
+        if not self.llm.available or not user.profile:
+            return query
+        
+        system_prompt = (
+            "You are a library search query optimizer. The user wants book recommendations. "
+            "Given the user's raw query and their profile (especially foundation, major, interests), "
+            "rewrite the query into a highly effective search string (a few precise keywords separated by spaces) "
+            "to query a vector database and keyword search. "
+            "Resolve any ambiguity. For example, if the user asks for 'agent' and their profile indicates "
+            "they know machine learning, output '人工智能 智能体 AI Agent'. "
+            "Only output the exact search keywords, nothing else."
+        )
+        profile_json = json.dumps(self._profile_snapshot(user), ensure_ascii=False)
+        user_prompt = f"Profile: {profile_json}\nRaw Query: {query}"
+        
+        try:
+            class EnrichedQuery(BaseModel):
+                keywords: str
+            
+            result = await self.llm.structured(
+                [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                EnrichedQuery
+            )
+            return result.keywords
+        except Exception:
+            return query
 
     def get_set(self, set_id: UUID, user_id: UUID) -> RecommendationSetRead | None:
         recommendation_set = self.session.get(RecommendationSet, set_id)

@@ -105,7 +105,7 @@ def list_messages(
 
 
 @router.post("/{conversation_id}/messages/stream")
-def stream_message(
+async def stream_message(
     conversation_id: UUID,
     payload: MessageCreate,
     request: Request,
@@ -115,7 +115,9 @@ def stream_message(
     conversation = ConversationRepository(session).get_owned(conversation_id, current_user.id)
     service = ConversationService(session)
     user_message = service.add_user_message(conversation, payload.content)
-    ProfileMemoryService(session).extract_from_message(current_user, user_message)
+    
+    # Run the LLM profile extraction asynchronously
+    await ProfileMemoryService(session).extract_from_message(current_user, user_message)
     constraints = ConversationConstraintService(session).update_from_message(
         conversation, payload.content, only_available=payload.only_available
     )
@@ -132,9 +134,13 @@ def stream_message(
         )
         try:
             general_chat = GeneralChatService(session)
-            if not general_chat.is_library_request(payload.content):
-                answer = await general_chat.answer(conversation, payload.content)
-                yield _event("text_delta", {"content": answer})
+            if not await general_chat.is_library_request(conversation, current_user, payload.content):
+                answer_chunks = []
+                async for chunk in general_chat.stream_answer(conversation, current_user, payload.content):
+                    answer_chunks.append(chunk)
+                    yield _event("text_delta", {"content": chunk})
+                
+                answer = "".join(answer_chunks)
                 assistant_message = service.add_assistant_message(conversation, answer)
                 yield _event(
                     "message_end",
@@ -150,8 +156,13 @@ def stream_message(
                 constraints=constraints.model_dump(),
             )
             yield _event("message_start", {"request_id": request_id, "status": "organizing"})
-            summary = recommendation.summary
-            yield _event("text_delta", {"content": summary})
+            
+            summary_chunks = []
+            async for chunk in RecommendationService(session).stream_summary(recommendation, current_user):
+                summary_chunks.append(chunk)
+                yield _event("text_delta", {"content": chunk})
+                
+            summary = "".join(summary_chunks)
             assistant_message = service.add_recommendation_message(
                 conversation, summary, recommendation.id
             )
@@ -169,6 +180,8 @@ def stream_message(
                 {"code": exc.code, "message": exc.message, "request_id": request_id},
             )
         except Exception:
+            import traceback
+            traceback.print_exc()
             yield _event(
                 "error",
                 {

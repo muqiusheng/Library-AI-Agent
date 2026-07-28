@@ -17,6 +17,7 @@ export interface UserSummary {
   id: string
   student_no: string
   display_name: string | null
+  avatar_url?: string | null
   role: UserRole
   is_active: boolean
   created_at: string

@@ -1,17 +1,27 @@
+import json
 import re
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
 from app.db.models import MemorySource, Message, ProfileMemory, User
+from app.integrations.llm.deepseek import DeepSeekError, DeepSeekProvider
 from app.repositories.profile_repository import ProfileRepository
 from app.schemas.profile import ProfileUpdate
 
-_TEMPORARY_MARKERS = ("这次", "本次", "今天", "暂时", "当前会话", "只看", "先不要")
-_TOPICS = ("Java", "Python", "数据库", "算法", "人工智能", "机器学习", "前端", "后端")
+class ProfileFact(BaseModel):
+    category: str = Field(description="Must be 'foundation', 'learning_goals', 'interests', 'difficulty_preference', 'major', or 'grade'")
+    key: str = Field(description="A unique key, e.g. 'topic:机器学习'")
+    value_json: str = Field(description="The extracted value serialized as a JSON string. For foundation, e.g. '{\"topic\": \"机器学习\", \"level\": \"none\", \"label\": \"零基础\"}'")
+    confidence: float = Field(description="Confidence score between 0.0 and 1.0")
+
+class ProfileExtraction(BaseModel):
+    facts: list[ProfileFact]
+
 
 
 @dataclass(frozen=True)
@@ -21,14 +31,14 @@ class ExtractedMemory:
     value: dict[str, Any] | list[Any] | str | int | float | bool
     confidence: float
 
-
 class ProfileMemoryService:
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, provider: DeepSeekProvider | None = None) -> None:
         self.session = session
         self.repository = ProfileRepository(session)
+        self.provider = provider or DeepSeekProvider()
 
-    def extract_from_message(self, user: User, message: Message) -> list[ProfileMemory]:
-        extracted = self._extract(message.content)
+    async def extract_from_message(self, user: User, message: Message) -> list[ProfileMemory]:
+        extracted = await self._extract_async(message.content)
         created = []
         for value in extracted:
             memory = self._replace_active(
@@ -127,36 +137,41 @@ class ProfileMemoryService:
         self.session.flush()
         return memory
 
-    @staticmethod
-    def _extract(text: str) -> list[ExtractedMemory]:
-        if any(marker in text for marker in _TEMPORARY_MARKERS):
+    async def _extract_async(self, text: str) -> list[ExtractedMemory]:
+        if not self.provider.available:
             return []
-        values: list[ExtractedMemory] = []
-        lowered = text.casefold()
-        for topic in _TOPICS:
-            normalized_topic = topic.casefold()
-            if normalized_topic not in lowered:
-                continue
-            none_pattern = rf"(没学过|没有学过|零基础|从零学|不懂)\s*{re.escape(topic)}"
-            reverse_none_pattern = rf"{re.escape(topic)}\s*(零基础|没学过|不会)"
-            if re.search(none_pattern, text, re.IGNORECASE) or re.search(
-                reverse_none_pattern, text, re.IGNORECASE
-            ):
-                values.append(
+            
+        system_prompt = (
+            "Analyze the user's message and extract any facts about their learning profile. "
+            "Categories can be 'foundation' (what they already know or don't know, e.g., '懂机器学习', '没学过Python'), "
+            "'learning_goals' (what they want to learn, e.g., '想学Agent', '考研'), "
+            "'interests' (topics they like), 'difficulty_preference' (beginner/progressive/intermediate/advanced), "
+            "'major' (their university major), or 'grade' (their year/grade). "
+            "Return an empty list if no clear facts are found. "
+            "For 'foundation', include level ('none', 'basic', 'intermediate', 'advanced')."
+        )
+        try:
+            result = await self.provider.structured(
+                [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": text}
+                ],
+                ProfileExtraction
+            )
+            extracted = []
+            for fact in result.facts:
+                try:
+                    parsed_value = json.loads(fact.value_json)
+                except Exception:
+                    parsed_value = fact.value_json
+                extracted.append(
                     ExtractedMemory(
-                        category="foundation",
-                        key=f"topic:{normalized_topic}",
-                        value={"topic": topic, "level": "none", "label": f"{topic} 零基础"},
-                        confidence=0.96,
+                        category=fact.category,
+                        key=fact.key,
+                        value=parsed_value,
+                        confidence=fact.confidence
                     )
                 )
-            if re.search(rf"(喜欢|感兴趣|想深入)\s*{re.escape(topic)}", text, re.IGNORECASE):
-                values.append(
-                    ExtractedMemory(
-                        category="interest",
-                        key=f"topic:{normalized_topic}",
-                        value={"topic": topic, "preference": "positive"},
-                        confidence=0.9,
-                    )
-                )
-        return values
+            return extracted
+        except Exception:
+            return []

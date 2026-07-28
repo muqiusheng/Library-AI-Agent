@@ -13,7 +13,9 @@ from app.db.models import (
     LearningPathStage,
     LearningPathStatus,
     RecommendationSet,
+    ProfileMemory,
 )
+from app.db.models.enums import MemorySource
 from app.schemas.learning_path import (
     LearningPathRead,
     LearningPathSummary,
@@ -188,6 +190,55 @@ class LearningPathService:
             path.status = LearningPathStatus.COMPLETED
         elif path.status in {LearningPathStatus.DRAFT, LearningPathStatus.COMPLETED}:
             path.status = LearningPathStatus.ACTIVE
+        self.session.commit()
+        return self.get_owned(path_id, user_id)
+
+    def complete_stage(self, path_id: UUID, stage_id: UUID, user_id: UUID) -> LearningPathRead:
+        path = self._model_owned(path_id, user_id)
+        target_stage = next((stage for stage in path.stages if stage.id == stage_id), None)
+        if not target_stage:
+            raise AppError(status_code=404, code="PATH_STAGE_NOT_FOUND", message="路径阶段不存在")
+
+        # Mark all books in the stage as completed
+        for book in target_stage.books:
+            book.state = BookUserStateValue.COMPLETED
+
+        # Recalculate progress
+        books = [book for stage in path.stages for book in stage.books]
+        completed = sum(book.state == BookUserStateValue.COMPLETED for book in books)
+        path.progress = Decimal(str(round(completed * 100 / len(books), 2)))
+        if completed == len(books):
+            path.status = LearningPathStatus.COMPLETED
+        elif path.status == LearningPathStatus.DRAFT:
+            path.status = LearningPathStatus.ACTIVE
+
+        # Sync to user profile memory
+        # Disable previous active memory for this key if exists
+        category = "achievement"
+        key = f"learning_stage_completed:{target_stage.title}"
+        existing = self.session.scalar(
+            select(ProfileMemory).where(
+                ProfileMemory.user_id == user_id,
+                ProfileMemory.category == category,
+                ProfileMemory.key == key,
+                ProfileMemory.is_active.is_(True)
+            )
+        )
+        if existing:
+            existing.is_active = False
+
+        memory = ProfileMemory(
+            user_id=user_id,
+            category=category,
+            key=key,
+            value_json={"stage": target_stage.title, "path": path.title, "objective": target_stage.objective},
+            source=MemorySource.MANUAL,
+            source_message_id=None,
+            confidence=1.0,
+            is_active=True,
+            is_user_edited=True,
+        )
+        self.session.add(memory)
         self.session.commit()
         return self.get_owned(path_id, user_id)
 

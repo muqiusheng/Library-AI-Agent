@@ -525,7 +525,180 @@ Invoke-RestMethod http://127.0.0.1:8180/health
 
 项目还提供 `home-start.ps1`、`home-stop.ps1`、备份、恢复演练和发布检查脚本。这些脚本中的 Docker Desktop 与 Tailscale 路径带有原开发机器默认值，换电脑后应通过脚本参数传入真实路径，或直接使用上面的通用 `docker compose` 命令。
 
-### 7.3 生产安全检查
+### 7.3 Windows 开机后的启动与关机前的关闭流程
+
+BookPath 的自动启动定时任务不是运行项目的必要条件。未安装自动任务或已将任务删除时，每次 Windows 开机后手动运行启动脚本即可。项目支持“仅限本机访问”和“通过 Tailscale Funnel 开放公网”两种启动模式，不要同时启动另一套 `docker-compose.yml` 开发栈。
+
+#### 启动前准备
+
+1. 登录 Windows，确认网络连接正常。
+2. 打开 VS Code，并在项目中打开 PowerShell 终端；也可以使用独立的普通 PowerShell，不需要管理员权限。
+3. 进入项目根目录：
+
+```powershell
+Set-Location "D:\data\Java\lgh\vs code\Library-AI-Agent"
+```
+
+如果项目克隆在其他位置，请将路径替换为自己的项目根目录；判断标准是该目录中可以看到 `docker-compose.home.yml` 和 `scripts` 文件夹。
+
+启动脚本会检查 Docker Engine。如果 Docker Desktop 尚未运行，脚本会尝试自动启动 Docker Desktop，并等待最多约 3 分钟。不要在看到第一次 Docker 连接失败时立刻重复运行脚本，应等待最终的成功或错误提示。
+
+#### 模式一：仅限本机访问
+
+只准备在当前电脑上使用时，添加 `-SkipFunnel`：
+
+```powershell
+.\scripts\home-start.ps1 -SkipFunnel
+```
+
+该命令会启动 PostgreSQL、FastAPI 后端和 Nginx 前端，但不会创建公网入口。成功时显示：
+
+```text
+BookPath is healthy at http://127.0.0.1:8180
+```
+
+浏览器访问：
+
+```text
+http://127.0.0.1:8180
+```
+
+执行健康检查：
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8180/health
+```
+
+返回内容中的 `data.status` 应为 `ok`，数据库和向量库状态也应为 `ok`。
+
+#### 模式二：通过 Tailscale Funnel 开放公网
+
+公网模式要求电脑已经安装并登录 Tailscale，并且当前 Tailnet 已允许 Funnel。启动时不要添加 `-SkipFunnel`：
+
+```powershell
+.\scripts\home-start.ps1
+```
+
+脚本会先启动并检查本地服务，再把 `http://127.0.0.1:8180` 映射到 Tailscale 提供的 HTTPS 公网地址。查看公网状态和地址：
+
+```powershell
+& "C:\Program Files\Tailscale\tailscale.exe" funnel status
+```
+
+公网地址通常采用以下格式：
+
+```text
+https://<设备名称>.<Tailnet 标识>.ts.net
+```
+
+本项目原部署机器当前的地址示例为：
+
+```text
+https://bookpath-home.tail949c1c.ts.net
+```
+
+换电脑、重新登录 Tailscale 或更换 Tailnet 后，域名可能变化，必须以 `tailscale funnel status` 的实际输出为准。建议关闭手机 Wi-Fi，使用手机流量访问公网地址，检查首页、登录和主要接口，确认服务确实可从外网访问。
+
+> Funnel 地址可以被互联网访问。开启前应确认生产密钥已经生成、管理员使用强密码、注册受到邀请码或注册开关保护，并且没有公开不应暴露的数据。
+
+#### 查看容器运行状态
+
+本地和公网模式都可以执行：
+
+```powershell
+docker compose -f docker-compose.home.yml ps
+```
+
+正常情况下应看到以下三个服务处于运行或健康状态：
+
+- `postgres`：PostgreSQL 数据库。
+- `backend`：FastAPI 后端。
+- `gateway`：Nginx 前端和 API 反向代理。
+
+需要排查启动问题时查看日志：
+
+```powershell
+docker compose -f docker-compose.home.yml logs --tail 100
+```
+
+持续查看日志：
+
+```powershell
+docker compose -f docker-compose.home.yml logs -f
+```
+
+按 `Ctrl+C` 只会退出日志查看，不会关闭正在运行的项目。
+
+#### 关闭公网并安全停止整个项目
+
+无论使用本地模式还是公网模式，关机前都使用同一个关闭命令：
+
+```powershell
+Set-Location "D:\data\Java\lgh\vs code\Library-AI-Agent"
+.\scripts\home-stop.ps1
+```
+
+如果 Funnel 已开启，脚本会先撤销公网配置；如果没有开启 Funnel，则直接跳过。随后脚本会关闭网关、后端和 PostgreSQL。成功时显示：
+
+```text
+BookPath containers stopped. Persistent volumes were preserved.
+```
+
+确认 Funnel 已撤销：
+
+```powershell
+& "C:\Program Files\Tailscale\tailscale.exe" funnel status --json
+```
+
+没有公网配置时应返回：
+
+```json
+{}
+```
+
+确认项目容器已经关闭：
+
+```powershell
+docker compose -f docker-compose.home.yml ps
+```
+
+输出中不应再有运行中的项目服务。此时可以关闭 Docker Desktop，然后正常关闭 Windows。
+
+`home-stop.ps1` 不会删除持久化数据，以下内容会在下次启动时恢复：
+
+- PostgreSQL 中的账号、馆藏、推荐和其他业务数据。
+- Chroma 向量索引。
+- 管理端上传文件。
+- Docker 命名卷中的其他持久化内容。
+
+日常关闭时不要执行 `docker compose down -v`，因为 `-v` 会永久删除数据卷。虽然直接关闭电脑通常不会主动删除数据，但建议先执行 `home-stop.ps1`，让 PostgreSQL 和其他服务正常退出。
+
+#### 日常命令速查
+
+仅限本机启动：
+
+```powershell
+Set-Location "D:\data\Java\lgh\vs code\Library-AI-Agent"
+.\scripts\home-start.ps1 -SkipFunnel
+```
+
+公网启动：
+
+```powershell
+Set-Location "D:\data\Java\lgh\vs code\Library-AI-Agent"
+.\scripts\home-start.ps1
+```
+
+关闭公网并停止整个项目：
+
+```powershell
+Set-Location "D:\data\Java\lgh\vs code\Library-AI-Agent"
+.\scripts\home-stop.ps1
+```
+
+两种模式的区别只有是否添加 `-SkipFunnel`：添加时仅允许本机通过 `127.0.0.1:8180` 访问；不添加时会额外建立 Tailscale HTTPS 公网入口。
+
+### 7.4 生产安全检查
 
 当 `APP_ENV=production` 时，后端会拒绝以下危险配置：
 

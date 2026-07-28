@@ -31,6 +31,10 @@ class LoginRequest(BaseModel):
     password: SecretStr = Field(min_length=1, max_length=128)
 
 
+class UserUpdateRequest(BaseModel):
+    display_name: str | None = Field(default=None, max_length=100)
+
+
 class ProfileSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -51,6 +55,7 @@ class UserSummary(BaseModel):
     id: UUID
     student_no: str
     display_name: str | None
+    avatar_url: str | None = None
     role: UserRole
     is_active: bool
     created_at: datetime

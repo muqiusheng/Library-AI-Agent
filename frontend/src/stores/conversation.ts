@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 import * as api from '@/api/conversations'
 import type {
@@ -13,7 +13,7 @@ import { getApiErrorMessage } from '@/utils/apiError'
 
 export const useConversationStore = defineStore('conversation', () => {
   const conversations = ref<ConversationSummary[]>([])
-  const activeId = ref<string | null>(null)
+  const activeId = ref<string | null>(sessionStorage.getItem('bookpath_active_conversation_id'))
   const messages = ref<WorkspaceMessage[]>([])
   const streamStatus = ref<StreamStatus>('idle')
   const loading = ref(false)
@@ -22,6 +22,11 @@ export const useConversationStore = defineStore('conversation', () => {
   const controller = ref<AbortController | null>(null)
   const activeConversation = computed(() => conversations.value.find((item) => item.id === activeId.value) ?? null)
   const isStreaming = computed(() => !['idle', 'complete', 'error'].includes(streamStatus.value))
+
+  watch(activeId, (val) => {
+    if (val) sessionStorage.setItem('bookpath_active_conversation_id', val)
+    else sessionStorage.removeItem('bookpath_active_conversation_id')
+  })
 
   async function loadConversations(): Promise<void> {
     loading.value = true
@@ -124,9 +129,17 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
+  function clear(): void {
+    conversations.value = []
+    activeId.value = null
+    messages.value = []
+    streamStatus.value = 'idle'
+    errorMessage.value = ''
+  }
+
   return {
     conversations, activeId, activeConversation, messages, streamStatus, loading,
     errorMessage, onlyAvailable, isStreaming, loadConversations, newConversation,
-    selectConversation, removeConversation, send, stop, retry
+    selectConversation, removeConversation, send, stop, retry, clear
   }
 })

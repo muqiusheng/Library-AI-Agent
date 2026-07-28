@@ -10,7 +10,10 @@ $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -RestartCount 2 -Re
 
 function Install-BookPathTask([string]$Name, $Trigger, [string]$Script, [string]$ExtraArguments = '') {
     $scriptPath = Join-Path $PSScriptRoot $Script
-    $arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`" $ExtraArguments".Trim()
+    # Scheduled tasks use an interactive logon so they can access the user's
+    # Docker Desktop session. Hide the console window to avoid a PowerShell
+    # window flashing every time a recurring task runs.
+    $arguments = "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$scriptPath`" $ExtraArguments".Trim()
     $action = New-ScheduledTaskAction -Execute $powershell -Argument $arguments -WorkingDirectory $root
     Register-ScheduledTask -TaskName $Name -Action $action -Trigger $Trigger -Principal $principal -Settings $settings -Force | Out-Null
 }

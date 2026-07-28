@@ -4,13 +4,13 @@ export default {
   theme: {
     extend: {
       colors: {
-        ink: '#17231d',
-        paper: '#f5f3ec',
-        sage: '#5c755f',
-        moss: '#2f4a38',
-        amber: '#d69b45',
-        navy: '#14283d',
-        'navy-light': '#1e3a55',
+        ink: 'rgba(var(--color-ink), <alpha-value>)',
+        paper: 'rgba(var(--color-paper), <alpha-value>)',
+        sage: 'rgba(var(--color-sage), <alpha-value>)',
+        moss: 'rgba(var(--color-moss), <alpha-value>)',
+        amber: 'rgba(var(--color-amber), <alpha-value>)',
+        navy: 'rgba(var(--color-navy), <alpha-value>)',
+        'navy-light': 'rgba(var(--color-navy-light), <alpha-value>)',
         slate: {
           DEFAULT: '#607080',
           50: '#f8fafc',
@@ -28,5 +28,7 @@ export default {
       }
     }
   },
-  plugins: []
+  plugins: [
+    require('@tailwindcss/typography'),
+  ]
 }

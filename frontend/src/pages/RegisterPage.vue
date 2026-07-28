@@ -96,6 +96,14 @@
 
           <div v-if="auth.errorMessage" class="mt-6 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">{{ auth.errorMessage }}</div>
 
+          <div v-if="step === 3" class="mt-6">
+            <label class="flex items-center gap-2 text-sm text-black/60 cursor-pointer">
+              <input v-model="agreed" type="checkbox" class="rounded border-black/20 text-navy focus:ring-navy/20 cursor-pointer" />
+              <span>我已阅读并同意 <RouterLink class="font-medium text-navy hover:underline" target="_blank" @click.stop to="/privacy">隐私说明</RouterLink></span>
+            </label>
+            <span v-if="errors.agreed" class="mt-1.5 block text-sm text-red-700">{{ errors.agreed }}</span>
+          </div>
+
           <footer class="mt-8 flex items-center justify-between gap-3 border-t border-black/5 pt-6">
             <button v-if="step > 1" class="min-h-11 rounded-xl border border-black/10 px-5 font-medium text-navy" type="button" @click="step--">上一步</button>
             <span v-else class="text-xs text-black/40">草稿已自动保存</span>
@@ -132,7 +140,8 @@ const savedDraft = loadRegistrationDraft()
 const form = reactive<RegistrationForm>({ ...emptyRegistrationForm(), ...(savedDraft ?? {}) })
 const step = ref(Math.min(3, Math.max(1, savedDraft?.step ?? 1)))
 const draftRestored = ref(Boolean(savedDraft))
-const errors = reactive({ studentNo: '', password: '', confirmPassword: '', grade: '', major: '', foundation: '', learningGoals: '' })
+const agreed = ref(false)
+const errors = reactive({ studentNo: '', password: '', confirmPassword: '', grade: '', major: '', foundation: '', learningGoals: '', agreed: '' })
 const grades = ['大一', '大二', '大三', '大四', '研究生', '其他']
 const majors = ['计算机科学与技术', '软件工程', '人工智能', '数据科学与大数据技术', '网络工程', '信息安全', '数字媒体技术', '其他']
 const foundationOptions = [
@@ -175,7 +184,8 @@ function validateCurrentStep(): boolean {
     return !errors.grade && !errors.major && !errors.foundation
   }
   errors.learningGoals = form.learningGoals.trim() ? '' : '请至少填写一个学习目标'
-  return !errors.learningGoals
+  errors.agreed = agreed.value ? '' : '请先阅读并同意隐私说明'
+  return !errors.learningGoals && !errors.agreed
 }
 
 async function next(): Promise<void> {

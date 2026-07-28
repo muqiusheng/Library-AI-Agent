@@ -38,16 +38,16 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
-      path: '/profile',
-      name: 'profile',
-      component: () => import('@/pages/ProfilePage.vue'),
-      meta: { requiresAuth: true }
-    },
-    {
-      path: '/paths/:id?',
-      name: 'learning-paths',
-      component: () => import('@/pages/LearningPathsPage.vue'),
-      meta: { requiresAuth: true }
+      path: '/personal-center',
+      component: () => import('@/pages/PersonalCenterPage.vue'),
+      meta: { requiresAuth: true },
+      children: [
+        { path: '', redirect: '/personal-center/basic' },
+        { path: 'basic', name: 'personal-basic', component: () => import('@/components/Profile/BasicInfoEditor.vue') },
+        { path: 'profile', name: 'personal-profile', component: () => import('@/components/Profile/ProfileEditor.vue') },
+        { path: 'paths/:id?', name: 'personal-paths', component: () => import('@/components/Profile/LearningPaths.vue') },
+        { path: 'theme', name: 'personal-theme', component: () => import('@/components/Profile/ThemeEditor.vue') }
+      ]
     },
     {
       path: '/admin',
@@ -77,10 +77,16 @@ router.beforeEach(async (to) => {
   }
   if (to.meta.publicOnly && auth.isAuthenticated) return auth.isAdmin ? '/admin' : '/workspace'
   if (to.meta.requiresAdmin && !auth.isAdmin) return '/workspace'
-  if (auth.isAdmin && ['workspace', 'profile', 'learning-paths'].includes(String(to.name))) {
+  if (auth.isAdmin && ['workspace', 'personal-center'].includes(String(to.name))) {
     return '/admin'
   }
   return true
+})
+
+router.onError((error) => {
+  if (error.message.includes('Failed to fetch dynamically imported module') || error.message.includes('Importing a module script failed')) {
+    window.location.reload()
+  }
 })
 
 export default router

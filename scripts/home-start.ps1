@@ -12,16 +12,35 @@ $root = Split-Path -Parent $PSScriptRoot
 $compose = Join-Path $root 'docker-compose.home.yml'
 
 if (-not (Test-Path -LiteralPath $DockerPath)) { throw "Docker CLI not found: $DockerPath" }
-& $DockerPath info *> $null
-if ($LASTEXITCODE -ne 0 -and (Test-Path -LiteralPath $DockerDesktopPath)) {
+
+function Test-DockerEngine {
+    # `docker info` writes a connection error to stderr while Docker Desktop is
+    # still starting. With ErrorActionPreference=Stop, PowerShell otherwise
+    # turns that expected native stderr output into a terminating error before
+    # this script gets a chance to launch Docker Desktop and retry.
+    $previousPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'SilentlyContinue'
+        & $DockerPath info *> $null
+        return $LASTEXITCODE -eq 0
+    }
+    finally {
+        $ErrorActionPreference = $previousPreference
+    }
+}
+
+$dockerReady = Test-DockerEngine
+if (-not $dockerReady -and (Test-Path -LiteralPath $DockerDesktopPath)) {
     Start-Process -FilePath $DockerDesktopPath -WindowStyle Hidden
     for ($attempt = 1; $attempt -le 60; $attempt++) {
         Start-Sleep -Seconds 3
-        & $DockerPath info *> $null
-        if ($LASTEXITCODE -eq 0) { break }
+        if (Test-DockerEngine) {
+            $dockerReady = $true
+            break
+        }
     }
 }
-if ($LASTEXITCODE -ne 0) { throw 'Docker Desktop engine is not ready.' }
+if (-not $dockerReady) { throw 'Docker Desktop engine is not ready.' }
 
 & $DockerPath compose -f $compose up -d
 if ($LASTEXITCODE -ne 0) { throw 'Docker Compose startup failed.' }

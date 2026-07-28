@@ -81,3 +81,17 @@ def update_book(
         path_id, book_id, current_user.id, payload.state
     )
     return success_response(request.state.request_id, value)
+
+
+@router.patch("/{path_id}/stages/{stage_id}/complete", response_model=ApiResponse[LearningPathRead])
+def complete_stage(
+    path_id: UUID,
+    stage_id: UUID,
+    request: Request,
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_db)],
+) -> dict:
+    value = LearningPathService(session).complete_stage(
+        path_id, stage_id, current_user.id
+    )
+    return success_response(request.state.request_id, value)
