@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei", sans-serif;
+    background: #FFFFFF;
+    color: #1E293B;
+    padding: 30px 40px;
+    width: 1400px;
+    margin: 0 auto;
+  }
+  .main-title {
+    text-align: center;
+    font-size: 26px;
+    font-weight: 800;
+    color: #0F172A;
+    letter-spacing: 1px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+  .main-title .badge {
+    background: #0B6E6D;
+    color: #FFF;
+    font-size: 13px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+
+  /* Top Stage Header Indicator */
+  .stage-bar {
+    display: grid;
+    grid-template-columns: 2fr 3fr 2fr;
+    gap: 16px;
+    margin-bottom: 12px;
+  }
+  .stage-pill {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 7px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #FFF;
+  }
+  .stage-blue { background: #1E40AF; }
+  .stage-teal { background: #0D9488; }
+  .stage-orange { background: #EA580C; }
+
+  /* 7 Cards Pipeline Container */
+  .pipeline-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 10px;
+    position: relative;
+  }
+  
+  .step-card {
+    background: #FFFFFF;
+    border-radius: 8px;
+    padding: 16px 12px 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    position: relative;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+    min-height: 250px;
+  }
+
+  /* Card Themes */
+  .card-blue {
+    border: 1.5px solid #1E40AF;
+  }
+  .card-blue .circle-num {
+    background: #1E40AF;
+    color: #FFF;
+  }
+  .card-blue .icon-box {
+    color: #1E40AF;
+    background: #EFF6FF;
+  }
+  .card-blue .step-title {
+    color: #1E40AF;
+  }
+
+  .card-teal {
+    border: 1.5px solid #0D9488;
+  }
+  .card-teal .circle-num {
+    background: #0D9488;
+    color: #FFF;
+  }
+  .card-teal .icon-box {
+    color: #0D9488;
+    background: #F0FDFA;
+  }
+  .card-teal .step-title {
+    color: #0D9488;
+  }
+
+  .card-orange {
+    border: 1.5px solid #EA580C;
+  }
+  .card-orange .circle-num {
+    background: #EA580C;
+    color: #FFF;
+  }
+  .card-orange .icon-box {
+    color: #EA580C;
+    background: #FFF7ED;
+  }
+  .card-orange .step-title {
+    color: #EA580C;
+  }
+
+  .circle-num {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    font-size: 14px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 12px;
+  }
+
+  .icon-box {
+    width: 44px;
+    height: 44px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 12px;
+  }
+  .icon-box svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .step-title {
+    font-size: 15px;
+    font-weight: 800;
+    margin-bottom: 10px;
+    letter-spacing: 0.5px;
+  }
+
+  .divider-line {
+    width: 70%;
+    height: 1px;
+    background: #E2E8F0;
+    margin-bottom: 10px;
+  }
+
+  .step-desc {
+    font-size: 12px;
+    color: #475569;
+    line-height: 1.5;
+    font-weight: 500;
+  }
+
+  /* Step Arrow Connector between cards */
+  .arrow-indicator {
+    position: absolute;
+    right: -13px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 16px;
+    z-index: 10;
+    background: #FFFFFF;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .arrow-indicator svg {
+    width: 14px;
+    height: 14px;
+    stroke: #94A3B8;
+  }
+
+  /* Bottom Trust Guarantee Bar */
+  .bottom-trust {
+    margin-top: 20px;
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-left: 4px solid #0D9488;
+    border-radius: 6px;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .bottom-trust .left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: #334155;
+  }
+  .bottom-trust .badge-tag {
+    background: #0D9488;
+    color: white;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .bottom-trust .pills-flow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748B;
+  }
+  .pills-flow span.active {
+    color: #0F172A;
+  }
+</style>
+</head>
+<body>
+
+  <div class="main-title">
+    <span>书途智启智能图书推荐引擎七步管道流程</span>
+    <span class="badge">执行逻辑与数据流图</span>
+  </div>
+
+  <!-- Top Stages -->
+  <div class="stage-bar">
+    <div class="stage-pill stage-blue">
+      <span>阶段一 · 交互意图理解 (Input & Intent)</span>
+    </div>
+    <div class="stage-pill stage-teal">
+      <span>阶段二 · 深度检索与召回过滤 (Retrieval & Filtering)</span>
+    </div>
+    <div class="stage-pill stage-orange">
+      <span>阶段三 · 精排决策与可信输出 (Rerank & Streaming)</span>
+    </div>
+  </div>
+
+  <!-- 7 Cards -->
+  <div class="pipeline-grid">
+    
+    <!-- Step 1 -->
+    <div class="step-card card-blue">
+      <div class="circle-num">1</div>
+      <div class="icon-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+      <div class="step-title">自然语言提问</div>
+      <div class="divider-line"></div>
+      <div class="step-desc">输入学习意图与方向<br><span style="color:#94A3B8;font-size:11px;">(自由口语化提问)</span></div>
+      <div class="arrow-indicator">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="3"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="step-card card-blue">
+      <div class="circle-num">2</div>
+      <div class="icon-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></div>
+      <div class="step-title">意图智能分类</div>
+      <div class="divider-line"></div>
+      <div class="step-desc">细分：精准选书 / 闲聊答疑 / 阶段研习规划</div>
+      <div class="arrow-indicator">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="3"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="step-card card-teal">
+      <div class="circle-num">3</div>
+      <div class="icon-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+      <div class="step-title">画像查询扩展</div>
+      <div class="divider-line"></div>
+      <div class="step-desc">融合学生专业背景、置信度与基础改写提示词</div>
+      <div class="arrow-indicator">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="3"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+    </div>
+
+    <!-- Step 4 -->
+    <div class="step-card card-teal">
+      <div class="circle-num">4</div>
+      <div class="icon-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
+      <div class="step-title">多模候选召回</div>
+      <div class="divider-line"></div>
+      <div class="step-desc">BGE向量稠密检索 + 全文索引初筛 Top50</div>
+      <div class="arrow-indicator">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="3"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+    </div>
+
+    <!-- Step 5 -->
+    <div class="step-card card-teal">
+      <div class="circle-num">5</div>
+      <div class="icon-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg></div>
+      <div class="step-title">规则约束过滤</div>
+      <div class="divider-line"></div>
+      <div class="step-desc">硬性规则过滤：剔除已借读 / 无库存 / 不感兴趣</div>
+      <div class="arrow-indicator">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="3"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+    </div>
+
+    <!-- Step 6 -->
+    <div class="step-card card-orange">
+      <div class="circle-num">6</div>
+      <div class="icon-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg></div>
+      <div class="step-title">六维打分重排</div>
+      <div class="divider-line"></div>
+      <div class="step-desc">专业度/难度等多维量化评分 + LLM深度推理精排</div>
+      <div class="arrow-indicator">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="3"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
+    </div>
+
+    <!-- Step 7 -->
+    <div class="step-card card-orange">
+      <div class="circle-num">7</div>
+      <div class="icon-box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></div>
+      <div class="step-title">流式实时输出</div>
+      <div class="divider-line"></div>
+      <div class="step-desc">卡片化展示 / 权威索书号 / 逐字动态流式打字</div>
+    </div>
+
+  </div>
+
+  <!-- Bottom Trust Bar -->
+  <div class="bottom-trust">
+    <div class="left">
+      <span class="badge-tag">权威学术保障</span>
+      <span><strong>全流程严格执行“馆藏事实与语言模型分离”机制：</strong>候选推荐图书 100% 源自本地图书馆真实借阅权威目录，彻底杜绝虚假书目与学术幻觉。</span>
+    </div>
+    <div class="pills-flow">
+      <span class="active">学生提问</span> → <span>意图识别</span> → <span>向量召回</span> → <span>权威事实约束</span> → <span class="active" style="color:#EA580C;">可信推荐闭环</span>
+    </div>
+  </div>
+
+</body>
+</html>
