@@ -5,11 +5,11 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$root = Split-Path -Parent $PSScriptRoot
+$root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $compose = Join-Path $root 'docker-compose.home.yml'
 $python = Join-Path $root '.venv\Scripts\python.exe'
 
-& $python -m ruff check app
+& $python -m ruff check app tests
 if ($LASTEXITCODE -ne 0) { throw 'Ruff check failed.' }
 & $python -m pytest
 if ($LASTEXITCODE -ne 0) { throw 'Backend tests failed.' }

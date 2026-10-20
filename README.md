@@ -4,7 +4,7 @@
 
 本项目不是让大模型凭空“编书单”：候选图书、馆藏状态和馆藏位置来自数据库，向量检索与规则负责召回和约束，大模型主要用于理解需求、组织说明和辅助生成标签。未配置大模型 API Key 时，系统仍可使用确定性降级方案完成基础推荐。
 
-> 想立即在本地运行？请阅读 [详细部署指南](./DEPLOYMENT.md)。推荐新手使用 Docker Desktop，一条命令即可启动前端、后端和 PostgreSQL。
+> 想立即在本地运行？请阅读 [详细部署指南](./docs/deployment/DEPLOYMENT.md)。推荐新手使用 Docker Desktop，一条命令即可启动前端、后端和 PostgreSQL。
 
 ## 核心能力
 
@@ -73,7 +73,7 @@
 
 ## 数据与降级策略
 
-- 仓库内提供示例馆藏文件：`docs/knowledge_base/books/ShiepbookInfo.xlsx`。
+- 仓库内提供示例馆藏文件：`resources/knowledge_base/books/ShiepbookInfo.xlsx`。
 - 导入后需要依次执行规则标签和向量索引构建，才具备完整的馆藏推荐能力。
 - 默认嵌入模型接口为 `BAAI/bge-small-zh-v1.5`；模型不可用时，程序会使用确定性的字符哈希向量降级。
 - `DEEPSEEK_API_KEY` 为可选配置。未配置时，基础推荐仍可工作，但依赖大模型的能力会降级或给出明确提示。
@@ -83,30 +83,32 @@
 
 ```text
 Library-AI-Agent/
-├─ app/
-│  ├─ api/v1/             # FastAPI 路由
-│  ├─ core/               # 配置、安全、错误处理、限流
-│  ├─ db/                 # SQLAlchemy 模型、会话与 Alembic 迁移
-│  ├─ integrations/       # 模型与外部能力适配
-│  ├─ pipelines/          # 馆藏导入、标签和向量索引
-│  ├─ repositories/       # 数据访问层
-│  ├─ services/           # 推荐、画像、学习路径等业务逻辑
-│  └─ tests/              # 后端自动化测试
-├─ frontend/
-│  ├─ src/api/            # 前端 API 客户端
-│  ├─ src/components/     # 页面组件
-│  ├─ src/pages/          # 学生端与管理端页面
-│  ├─ src/stores/         # Pinia 状态管理
-│  └─ src/types/          # TypeScript 类型
+├─ app/                    # 后端接口、业务、数据访问、模型适配与管道
+├─ frontend/               # Vue 前端：页面、组件、API、状态和类型
+├─ tests/                  # 后端自动化测试，与 app/ 分离
+├─ resources/
+│  └─ knowledge_base/      # 示例馆藏、规则和知识库样本
+├─ scripts/
+│  ├─ dev/                 # 本地启停、质量验证、演示重置
+│  ├─ home/                # 家庭部署、备份恢复和定时任务管理
+│  └─ network/             # Tailscale Funnel 网络入口
 ├─ docs/
-│  ├─ knowledge_base/     # 示例馆藏与规则知识库
-│  └─ PRIVACY.md          # 隐私与试用边界
-├─ scripts/               # 启停、验证、备份与运维脚本
-├─ docker-compose.yml     # 本地 Docker 开发栈
-├─ docker-compose.home.yml# 家庭服务器生产栈
-├─ DEPLOYMENT.md          # 新手部署指南
-└─ README.md              # 项目介绍
+│  ├─ README.md            # 文档导航
+│  ├─ STRUCTURE.md         # 目录职责、迁移对照和维护规则
+│  ├─ deployment/          # 环境与部署指南
+│  ├─ development/         # 开发迭代指南
+│  ├─ policies/            # 隐私与试用边界
+│  ├─ references/          # 立项参考、官方资料和历史文本提取
+│  └─ competition/         # 参赛计划书与展示图
+├─ data/                   # 本机运行数据与备份，Git 忽略
+├─ Dockerfile              # 后端镜像构建入口
+├─ docker-compose.yml      # 本地 Docker 开发栈
+├─ docker-compose.home.yml # 家庭服务器生产栈
+├─ CONTRIBUTING.md         # 协作与 Git 工作流
+└─ README.md               # 项目介绍与快速开始
 ```
+
+完整说明见 [目录职责与迁移对照](./docs/STRUCTURE.md)，其他资料见 [文档导航](./docs/README.md)。后端入口仍为 `app.main:app`，命令默认从仓库根目录执行。
 
 ## 快速开始
 
@@ -119,7 +121,7 @@ Copy-Item .env.example .env
 docker compose up -d --build
 ```
 
-打开 <http://localhost:4173>。首次启动只创建数据库表，若要看到真实推荐结果，还需导入示例馆藏、生成标签和索引。完整命令、管理员创建、故障排查、原生开发和生产部署均在 [DEPLOYMENT.md](./DEPLOYMENT.md) 中说明。
+打开 <http://localhost:4173>。首次启动只创建数据库表，若要看到真实推荐结果，还需导入示例馆藏、生成标签和索引。完整命令、管理员创建、故障排查、原生开发和生产部署均在 [部署指南](./docs/deployment/DEPLOYMENT.md) 中说明。
 
 ## 常用地址
 
@@ -135,7 +137,7 @@ docker compose up -d --build
 Windows PowerShell 可执行项目自带的完整验证脚本：
 
 ```powershell
-.\scripts\verify.ps1
+.\scripts\dev\verify.ps1
 ```
 
 脚本会运行后端 Pytest、Ruff、前端 Vitest、TypeScript 类型检查和生产构建。各命令也可单独运行，详见部署指南中的“验证安装与运行测试”。
@@ -147,7 +149,7 @@ Windows PowerShell 可执行项目自带的完整验证脚本：
 - 生产配置会拒绝默认 JWT 密钥、默认数据库密码和未启用限流的组合。
 - 项目中的预约是演示功能，不代表已连接学校图书馆系统。
 - 管理员导入真实数据前，应确认数据授权范围并移除不应公开的个人信息。
-- 更完整的边界说明见 [隐私说明](./docs/PRIVACY.md)。
+- 更完整的边界说明见 [隐私说明](./docs/policies/PRIVACY.md)。
 
 ## 当前边界
 
@@ -160,14 +162,14 @@ Windows PowerShell 可执行项目自带的完整验证脚本：
 
 分支命名、代码拉取与推送、冲突处理、PR 评审和发布约定见 [项目协作指南](./CONTRIBUTING.md)。项目采用 `main` + 短期任务分支的 GitHub Flow，通过 PR 集成改动。
 
-后续新增功能、修复缺陷和发布版本，请阅读 [项目迭代实操指南](./docs/ITERATION.md)，按需求验收、任务分支、实现验证、PR 合并、版本发布及回滚的流程推进。首次迭代前需先完成交付分支到 `main` 的集成与默认分支切换。
+后续新增功能、修复缺陷和发布版本，请阅读 [项目迭代实操指南](./docs/development/ITERATION.md)，按需求验收、任务分支、实现验证、PR 合并、版本发布及回滚的流程推进。首次迭代前需先完成交付分支到 `main` 的集成与默认分支切换。
 
 欢迎通过 Issue 报告缺陷或提出功能建议。提交代码前请：
 
 1. 从新分支进行修改。
 2. 不提交密钥、运行时数据和个人信息。
 3. 为新增后端逻辑补充 Pytest，为前端工具逻辑补充 Vitest。
-4. 执行 `.\scripts\verify.ps1` 并确保检查通过。
+4. 执行 `.\scripts\dev\verify.ps1` 并确保检查通过。
 5. 在 Pull Request 中说明功能影响、验证方式和必要的配置变化。
 
 ## License

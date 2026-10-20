@@ -2,6 +2,8 @@
 
 本文面向第一次接触 Python、Vue 或 Docker 的用户，目标是让你在自己的电脑上完整启动书途智启。推荐优先使用“方式一：Docker Compose”，因为它不要求你单独安装 Python、Node.js 和 PostgreSQL。
 
+目录职责与旧路径对照见 [项目结构说明](../STRUCTURE.md)，其他指南见 [文档导航](../README.md)。本文命令仍从仓库根目录执行。
+
 ## 1. 部署后会启动什么
 
 Docker 本地栈包含三个服务：
@@ -135,7 +137,7 @@ Remove-Item Env:BOOKPATH_ADMIN_PASSWORD
 新数据库只有表结构，没有可推荐的图书。仓库提供了示例馆藏 Excel，先复制进后端容器：
 
 ```powershell
-docker compose cp "docs/knowledge_base/books/ShiepbookInfo.xlsx" backend:/tmp/library.xlsx
+docker compose cp "resources/knowledge_base/books/ShiepbookInfo.xlsx" backend:/tmp/library.xlsx
 ```
 
 然后依次执行导入、规则标签和向量索引构建：
@@ -301,7 +303,7 @@ Remove-Item Env:BOOKPATH_ADMIN_PASSWORD
 导入仓库内示例馆藏：
 
 ```powershell
-uv run python -m app.cli import-library "docs\knowledge_base\books\ShiepbookInfo.xlsx"
+uv run python -m app.cli import-library "resources\knowledge_base\books\ShiepbookInfo.xlsx"
 uv run python -m app.cli tag-books
 uv run python -m app.cli build-index
 ```
@@ -387,14 +389,14 @@ Invoke-RestMethod http://localhost:8000/health
 已按原生开发方式安装依赖后，可在 Windows PowerShell 执行：
 
 ```powershell
-.\scripts\verify.ps1
+.\scripts\dev\verify.ps1
 ```
 
 也可以分别运行：
 
 ```powershell
-uv run pytest app/tests -q
-uv run ruff check app
+uv run pytest tests -q
+uv run ruff check app tests
 Set-Location frontend
 npm run test
 npm run build
@@ -494,7 +496,7 @@ docker compose up -d --build frontend
 Windows PowerShell：
 
 ```powershell
-.\scripts\init-home-env.ps1
+.\scripts\home\init-home-env.ps1
 ```
 
 脚本根据 `.env.home.example` 生成 `.env.home`，自动创建随机 PostgreSQL 密码和 JWT 密钥。为了防止误覆盖，已有 `.env.home` 时脚本会停止。
@@ -548,7 +550,7 @@ Set-Location "D:\data\Java\lgh\vs code\Library-AI-Agent"
 只准备在当前电脑上使用时，添加 `-SkipFunnel`：
 
 ```powershell
-.\scripts\home-start.ps1 -SkipFunnel
+.\scripts\home\home-start.ps1 -SkipFunnel
 ```
 
 该命令会启动 PostgreSQL、FastAPI 后端和 Nginx 前端，但不会创建公网入口。成功时显示：
@@ -576,7 +578,7 @@ Invoke-RestMethod http://127.0.0.1:8180/health
 公网模式要求电脑已经安装并登录 Tailscale，并且当前 Tailnet 已允许 Funnel。启动时不要添加 `-SkipFunnel`：
 
 ```powershell
-.\scripts\home-start.ps1
+.\scripts\home\home-start.ps1
 ```
 
 脚本会先启动并检查本地服务，再把 `http://127.0.0.1:8180` 映射到 Tailscale 提供的 HTTPS 公网地址。查看公网状态和地址：
@@ -635,7 +637,7 @@ docker compose -f docker-compose.home.yml logs -f
 
 ```powershell
 Set-Location "D:\data\Java\lgh\vs code\Library-AI-Agent"
-.\scripts\home-stop.ps1
+.\scripts\home\home-stop.ps1
 ```
 
 如果 Funnel 已开启，脚本会先撤销公网配置；如果没有开启 Funnel，则直接跳过。随后脚本会关闭网关、后端和 PostgreSQL。成功时显示：
@@ -679,21 +681,21 @@ docker compose -f docker-compose.home.yml ps
 
 ```powershell
 Set-Location "D:\data\Java\lgh\vs code\Library-AI-Agent"
-.\scripts\home-start.ps1 -SkipFunnel
+.\scripts\home\home-start.ps1 -SkipFunnel
 ```
 
 公网启动：
 
 ```powershell
 Set-Location "D:\data\Java\lgh\vs code\Library-AI-Agent"
-.\scripts\home-start.ps1
+.\scripts\home\home-start.ps1
 ```
 
 关闭公网并停止整个项目：
 
 ```powershell
 Set-Location "D:\data\Java\lgh\vs code\Library-AI-Agent"
-.\scripts\home-stop.ps1
+.\scripts\home\home-stop.ps1
 ```
 
 两种模式的区别只有是否添加 `-SkipFunnel`：添加时仅允许本机通过 `127.0.0.1:8180` 访问；不添加时会额外建立 Tailscale HTTPS 公网入口。
@@ -727,7 +729,7 @@ Set-Location "D:\data\Java\lgh\vs code\Library-AI-Agent"
 - [ ] `git log -p` 历史中没有曾经提交过的密钥；仅删除当前文件不能清除历史。
 - [ ] 已添加符合项目意图的 `LICENSE`。
 - [ ] README 中的仓库地址、作者、截图和联系方式已补充为最终信息。
-- [ ] 执行 `.\scripts\verify.ps1` 并通过全部测试与构建。
+- [ ] 执行 `.\scripts\dev\verify.ps1` 并通过全部测试与构建。
 - [ ] 在一台没有本项目缓存的新电脑或虚拟机上按本文 Docker 步骤验证启动。
 
 完成以上步骤后，新用户应能通过“复制配置 → 启动容器 → 创建管理员 → 导入馆藏 → 构建标签与索引”的顺序，在本地得到可用的完整系统。

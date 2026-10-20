@@ -1,6 +1,8 @@
 # 项目迭代实操指南
 
-本指南说明如何把一个新想法变成可评审、可发布、可追溯的项目版本。Git 命令默认在仓库根目录的 Windows PowerShell 执行；示例 Issue 编号、分支名和版本号均需替换。分支规则及冲突处理见 [协作指南](../CONTRIBUTING.md)，环境安装见 [部署指南](../DEPLOYMENT.md)。
+本指南说明如何把一个新想法变成可评审、可发布、可追溯的项目版本。Git 命令默认在仓库根目录的 Windows PowerShell 执行；示例 Issue 编号、分支名和版本号均需替换。分支规则及冲突处理见 [协作指南](../../CONTRIBUTING.md)，环境安装见 [部署指南](../deployment/DEPLOYMENT.md)。
+
+查找代码、测试和资料的放置位置时，参考 [项目结构说明](../STRUCTURE.md)；所有项目指南入口见 [文档导航](../README.md)。
 
 ## 1. 先完成主线交接，再开始常规迭代
 
@@ -88,6 +90,9 @@ try { npm ci } finally { Pop-Location }
 | 数据库结构 | `app/db/migrations/versions/` | 升级脚本、已有数据、回退或补救方案 |
 | 推荐与模型能力 | `app/services/recommendation_service.py`、`app/integrations/`、`app/pipelines/` | 真实馆藏约束、降级、延迟与模型费用 |
 | 配置和部署 | `app/core/`、配置示例、Compose 文件 | 默认值、必填项、密钥、环境与文档 |
+| 后端测试 | `tests/` | 用例发现、服务契约与回归验证 |
+| 静态馆藏与知识库样本 | `resources/knowledge_base/` | 来源、版本、导入命令及文档路径 |
+| 开发、家庭运维与网络脚本 | `scripts/dev/`、`scripts/home/`、`scripts/network/` | 仓库根目录定位、调用入口及已有定时任务兼容 |
 
 业务逻辑放在服务层，避免堆在页面或路由中。变更 API 时同步前端 API 客户端和类型；新增字段尽量先做兼容扩展，不直接删除旧客户端仍使用的字段。
 
@@ -143,9 +148,9 @@ git push -u origin feat/123-stage-deadline
 准备评审时，代码变更执行完整检查。下面显式检查退出码，某一步失败就停止，避免把后续命令的成功误认为全部通过：
 
 ```powershell
-uv run --locked pytest app/tests -q
+uv run --locked pytest tests -q
 if ($LASTEXITCODE -ne 0) { throw '后端测试失败' }
-uv run --locked ruff check app
+uv run --locked ruff check app tests
 if ($LASTEXITCODE -ne 0) { throw 'Ruff 检查失败' }
 Push-Location frontend
 try {
@@ -160,11 +165,11 @@ if ($LASTEXITCODE -ne 0) { throw '差异格式检查失败' }
 
 还要启动隔离的测试环境，实际走通“登录 → 画像 → 推荐 → 反馈 → 学习路径”，按改动范围检查管理端导入、标签与索引。页面变化需人工检查交互；新增权限必须测试无登录、普通学生和管理员边界。测试 API Key 关闭或模型失败时的降级，不能只测模型正常返回。
 
-在 PR 记录执行命令、结果、人工操作步骤及未覆盖内容。纯文档变更验证链接、路径、命令和格式即可。项目现有 `scripts/verify.ps1` 对原生命令的退出码检查不完整，使用时需核对各项输出；末尾成功提示不能替代结果检查。
+在 PR 记录执行命令、结果、人工操作步骤及未覆盖内容。纯文档变更验证链接、路径、命令和格式即可。项目现有 `scripts/dev/verify.ps1` 对原生命令的退出码检查不完整，使用时需核对各项输出；末尾成功提示不能替代结果检查。
 
 ## 7. 评审、合并与完成标准
 
-PR 设置 `base: main`、`compare: 本次任务分支`，使用 [PR 模板](../.github/pull_request_template.md)。说明需求与验收条件、实现后的行为、配置/API/数据库影响、验证证据和发布回滚步骤。前端变化附截图，关联 Issue 可写 `Closes #123`。
+PR 设置 `base: main`、`compare: 本次任务分支`，使用 [PR 模板](../../.github/pull_request_template.md)。说明需求与验收条件、实现后的行为、配置/API/数据库影响、验证证据和发布回滚步骤。前端变化附截图，关联 Issue 可写 `Closes #123`。
 
 任务进入“可合并”状态前应满足：
 
@@ -202,7 +207,7 @@ git push origin v2.1.0
 
 ### 部署与上线验收
 
-先在独立测试环境按 [部署指南](../DEPLOYMENT.md) 演练升级和恢复，再安排生产发布窗口。部署使用干净、专用的检出目录，核对标签对应的提交，保存上一版本标签、镜像或可重建条件，以及当前配置和数据库迁移版本。
+先在独立测试环境按 [部署指南](../deployment/DEPLOYMENT.md) 演练升级和恢复，再安排生产发布窗口。部署使用干净、专用的检出目录，核对标签对应的提交，保存上一版本标签、镜像或可重建条件，以及当前配置和数据库迁移版本。
 
 1. 发布前备份 PostgreSQL、上传目录及需要保留的向量索引，记录备份位置和恢复验证结果。
 2. 检查新增环境变量、数据迁移、索引重建、磁盘空间和预计停机影响。
@@ -214,11 +219,11 @@ git push origin v2.1.0
 
 | 脚本 | 用途及限制 |
 |---|---|
-| `scripts/home-backup.ps1` | 备份数据库和上传目录；需传入实际 Docker 路径，当前脚本未归档 Chroma 卷 |
-| `scripts/home-smoke-test.ps1` | 检查页面、健康和匿名鉴权；`-BaseUrl` 指向目标环境，不代替业务验收 |
-| `scripts/home-release-check.ps1` | 现有家庭栈检查含固定馆藏数量及版本标识，须先核对是否适用；不包含前端 Vitest |
-| `scripts/home-restore-drill.ps1` | 恢复演练；使用前阅读脚本并确认隔离环境 |
-| `scripts/home-restore.ps1` | 替换生产数据库，属于恢复操作；不能当作普通重启使用 |
+| `scripts/home/home-backup.ps1` | 备份数据库和上传目录；需传入实际 Docker 路径，当前脚本未归档 Chroma 卷 |
+| `scripts/home/home-smoke-test.ps1` | 检查页面、健康和匿名鉴权；`-BaseUrl` 指向目标环境，不代替业务验收 |
+| `scripts/home/home-release-check.ps1` | 现有家庭栈检查含固定馆藏数量及版本标识，须先核对是否适用；不包含前端 Vitest |
+| `scripts/home/home-restore-drill.ps1` | 恢复演练；使用前阅读脚本并确认隔离环境 |
+| `scripts/home/home-restore.ps1` | 替换生产数据库，属于恢复操作；不能当作普通重启使用 |
 
 `Dockerfile` 的后端启动命令会先运行 `alembic upgrade head`，因此重建启动可能立刻修改数据库，备份及迁移评审必须在前。家庭栈的构建更新命令为 `docker compose -f docker-compose.home.yml up -d --build`，只在确认上述发布条件后执行。开发栈使用 `docker-compose.yml`；两套环境和数据卷不要混用。
 

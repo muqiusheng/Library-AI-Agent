@@ -2,7 +2,9 @@
 
 适用仓库：`https://github.com/muqiusheng/Library-AI-Agent.git`。命令默认使用 Windows PowerShell，在仓库根目录执行；分支名、Issue 编号和文件路径示例应按任务替换。
 
-准备开发下一项功能或发布新版本时，请按 [项目迭代实操指南](./docs/ITERATION.md) 执行。指南覆盖首次主线交接、需求验收、分层实现、数据库迁移、测试评审、版本发布、回滚和紧急修复。
+准备开发下一项功能或发布新版本时，请按 [项目迭代实操指南](./docs/development/ITERATION.md) 执行。指南覆盖首次主线交接、需求验收、分层实现、数据库迁移、测试评审、版本发布、回滚和紧急修复。
+
+目录职责与旧路径对照见 [项目结构说明](./docs/STRUCTURE.md)，其他资料入口见 [文档导航](./docs/README.md)。后端测试统一放在 `tests/`，静态样本放在 `resources/`，脚本按 `scripts/dev/`、`scripts/home/` 和 `scripts/network/` 分类。
 
 ## 1. 分支设计
 
@@ -51,7 +53,7 @@ git ls-remote --heads origin
 
 ## 3. 首次获取代码
 
-准备 Git、Python 3.12+、uv，以及满足项目构建要求的 Node.js/npm。安装和运行细节见 [部署指南](./DEPLOYMENT.md)。
+准备 Git、Python 3.12+、uv，以及满足项目构建要求的 Node.js/npm。安装和运行细节见 [部署指南](./docs/deployment/DEPLOYMENT.md)。
 
 ```powershell
 git clone https://github.com/muqiusheng/Library-AI-Agent.git
@@ -143,15 +145,15 @@ PR 应说明问题、实现后行为、影响范围、验证证据，以及新�
 代码变更在依赖已安装的环境中执行以下检查；任一步失败都应先修复，再继续提交评审：
 
 ```powershell
-uv run --locked pytest app/tests -q
-uv run --locked ruff check app
+uv run --locked pytest tests -q
+uv run --locked ruff check app tests
 Push-Location frontend
 npm run test
 npm run build
 Pop-Location
 ```
 
-`npm run build` 已包含 TypeScript 类型检查。也可运行项目现有的 `.\scripts\verify.ps1`，但该脚本目前没有逐步检查原生命令退出码，不能只凭末尾的成功提示判断全部通过，应核对每项结果。纯文档变更检查链接、路径、命令和 `git diff --check` 即可。
+`npm run build` 已包含 TypeScript 类型检查。也可运行项目现有的 `.\scripts\dev\verify.ps1`，但该脚本目前没有逐步检查原生命令退出码，不能只凭末尾的成功提示判断全部通过，应核对每项结果。纯文档变更检查链接、路径、命令和 `git diff --check` 即可。
 
 至少由另一位成员检查业务逻辑、权限与数据边界、兼容性、验证结果。新增行为应有相应测试；修复缺陷时优先增加能复现问题的测试。确认讨论已解决后，由维护者执行 Squash and merge，合并提交标题遵循提交规范。合并代表代码集成，生产部署另按部署指南执行。
 
@@ -213,4 +215,4 @@ git fetch --prune origin
 
 不要提交 `.env`、API Key、密码、真实用户数据、数据库、日志或本地运行缓存。提交前检查 `git diff --cached`；`.gitignore` 不会移除已被 Git 跟踪的敏感文件。如密钥曾被推送，应立即撤销或轮换，并由维护者评估历史清理。
 
-流程依据：[GitHub Flow](https://docs.github.com/en/get-started/using-github/github-flow)、[受保护分支](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches)。项目运行与部署参考 [DEPLOYMENT.md](./DEPLOYMENT.md)。
+流程依据：[GitHub Flow](https://docs.github.com/en/get-started/using-github/github-flow)、[受保护分支](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches)。项目运行与部署参考 [部署指南](./docs/deployment/DEPLOYMENT.md)。

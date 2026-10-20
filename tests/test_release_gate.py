@@ -3,7 +3,7 @@ from pathlib import Path
 from app.api.v1.conversations import _event
 from app.main import app
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_openapi_contains_frontend_contract_paths() -> None:
