@@ -1,0 +1,78 @@
+[
+  {
+    "name": "Steam 服务",
+    "selected": [
+      "bbd6dafa-c295-eb11-abaa-a0d3c1f2a15d",
+      "e21aeaca-1641-4b53-a738-b49864b53c02",
+      "bcd6dafa-c295-eb11-abaa-a0d3c1f2a15d",
+      "abd6dafa-c295-eb11-abaa-a0d3c1f2a15d",
+      "43059edf-6291-4ac6-8d69-8446a3469b20",
+      "163eb6b7-9be6-4b62-86c8-90a981ac151b",
+      "379bf61c-398c-444e-968a-1dccc3202e55",
+      "bdd6dafa-c295-eb11-abaa-a0d3c1f2a15d",
+      "2f3698d0-72c3-494f-b520-d65ec812bfe4",
+      "32e1a3f3-c313-4c7c-b137-86a6da75be4e",
+      "3b4ab0f6-d0fa-4964-9106-26d056c6bef2",
+      "349e3ce8-a0b1-4403-8436-b1027f8d98d3",
+      "fa00e37f-d42d-4c34-ad5c-78c8656af769",
+      "53556a54-d8d9-4e5b-870b-0303bd1a46d0",
+      "48619cb8-373d-413c-858b-7bc805544dd9",
+      "adc98902-7fe5-47f1-9f3b-c09f653c19a7",
+      "f3ce179e-7de7-4bc9-a81b-a0e3fdfee372",
+      "ec118c6d-4733-4cc9-b727-2258037e2418",
+      "245eeba0-0c25-4630-b17a-4eee2acad14e"
+    ]
+  },
+  {
+    "name": "Twitch 直播",
+    "selected": []
+  },
+  {
+    "name": "Origin",
+    "selected": []
+  },
+  {
+    "name": "Uplay",
+    "selected": []
+  },
+  {
+    "name": "公共 CDN",
+    "selected": []
+  },
+  {
+    "name": "Spotify",
+    "selected": []
+  },
+  {
+    "name": "Google 翻译",
+    "selected": []
+  },
+  {
+    "name": "国外验证码平台",
+    "selected": []
+  },
+  {
+    "name": "Github",
+    "selected": []
+  },
+  {
+    "name": "Roblox",
+    "selected": []
+  },
+  {
+    "name": "Nexus Mods",
+    "selected": []
+  },
+  {
+    "name": "Mod.io",
+    "selected": []
+  },
+  {
+    "name": "网盘服务",
+    "selected": []
+  },
+  {
+    "name": "其它网站",
+    "selected": []
+  }
+]
