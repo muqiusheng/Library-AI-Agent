@@ -1,0 +1,9 @@
+<template>
+  <Teleport to="body"><div class="fixed inset-0 z-50 bg-black/25" @click.self="$emit('close')"><aside class="ml-auto h-full w-full max-w-md overflow-y-auto bg-white p-5 shadow-2xl sm:p-6"><header class="flex items-start justify-between gap-3"><div><p class="text-xs font-semibold uppercase tracking-[.16em] text-sage">Notifications</p><h2 class="mt-2 text-2xl font-semibold text-navy">站内通知</h2></div><button class="grid h-10 w-10 place-items-center rounded-xl border border-black/10 text-xl" @click="$emit('close')">×</button></header><div class="mt-5 flex items-center justify-between"><p class="text-xs text-black/40">{{ store.unreadCount }} 条未读</p><button class="text-xs font-semibold text-navy" @click="store.readAll">全部标为已读</button></div><div class="mt-4 space-y-3"><button v-for="item in store.items" :key="item.id" class="w-full rounded-2xl border p-4 text-left" :class="item.read_at ? 'border-black/5 opacity-60' : 'border-sage/20 bg-sage/5'" @click="store.read(item.id)"><div class="flex items-start justify-between gap-3"><strong class="text-sm text-navy">{{ item.title }}</strong><span v-if="!item.read_at" class="mt-1 h-2 w-2 shrink-0 rounded-full bg-sage" /></div><p class="mt-2 text-sm leading-6 text-black/55">{{ item.content }}</p><p class="mt-2 text-[10px] text-black/30">{{ formatDate(item.created_at) }}</p></button><p v-if="!store.items.length" class="py-10 text-center text-sm text-black/40">暂无通知</p></div></aside></div></Teleport>
+</template>
+<script setup lang="ts">
+import { onMounted } from 'vue'
+import { useNotificationStore } from '@/stores/notifications'
+defineEmits<{ close: [] }>(); const store = useNotificationStore(); onMounted(store.refresh)
+function formatDate(value: string) { return new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) }
+</script>

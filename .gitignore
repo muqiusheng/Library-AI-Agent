@@ -1,6 +1,9 @@
 # Python-generated files
 __pycache__/
 *.py[oc]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 build/
 dist/
 wheels/
@@ -8,3 +11,22 @@ wheels/
 
 # Virtual environments
 .venv
+.uv-cache/
+.uv-python/
+.env
+.bookpath-pids
+data/uploads/
+.env.*
+!.env.example
+!.env.home.example
+
+# Chroma 向量数据库（可从 Excel/SQLite 重建）
+chroma_db/
+
+# 前端依赖
+frontend/node_modules/
+frontend/dist/
+
+# Runtime data
+data/
+uploads/

@@ -1,0 +1,36 @@
+{
+    "name": "bookpath-frontend",
+    "version": "2.0.0",
+    "type": "module",
+    "private": true,
+    "scripts": {
+        "dev": "vite",
+        "test": "vitest run",
+        "type-check": "vue-tsc --noEmit",
+        "build": "npm run type-check && vite build",
+        "preview": "vite preview"
+    },
+    "dependencies": {
+        "@tailwindcss/typography": "^0.5.20",
+        "@types/dompurify": "^3.0.5",
+        "@types/marked": "^5.0.2",
+        "axios": "^1.15.2",
+        "dompurify": "^3.4.12",
+        "echarts": "^6.1.0",
+        "marked": "^18.0.7",
+        "pinia": "^3.0.3",
+        "vue": "^3.4.0",
+        "vue-echarts": "^8.0.1",
+        "vue-router": "^4.3.0"
+    },
+    "devDependencies": {
+        "@vitejs/plugin-vue": "^5.2.4",
+        "autoprefixer": "^10.4.21",
+        "postcss": "^8.5.6",
+        "tailwindcss": "^3.4.17",
+        "typescript": "^5.8.3",
+        "vite": "^5.4.19",
+        "vitest": "^3.2.4",
+        "vue-tsc": "^2.2.12"
+    }
+}

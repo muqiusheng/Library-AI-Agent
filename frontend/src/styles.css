@@ -1,0 +1,111 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-ink: 23, 35, 29;
+  --color-paper: 245, 243, 236;
+  --color-sage: 92, 117, 95;
+  --color-moss: 47, 74, 56;
+  --color-amber: 214, 155, 69;
+  --color-navy: 20, 40, 61;
+  --color-navy-light: 30, 58, 85;
+  color: rgba(var(--color-ink), 1);
+  background: rgba(var(--color-paper), 1);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  font-synthesis: none;
+}
+
+html.theme-mist {
+  --color-ink: 35, 45, 41;
+  --color-paper: 242, 244, 241;
+  --color-sage: 140, 155, 145;
+  --color-moss: 105, 122, 110;
+  --color-amber: 190, 175, 150;
+  --color-navy: 55, 75, 70;
+  --color-navy-light: 80, 100, 95;
+}
+
+html.theme-sand {
+  --color-ink: 50, 45, 40;
+  --color-paper: 247, 245, 242;
+  --color-sage: 170, 160, 150;
+  --color-moss: 135, 125, 115;
+  --color-amber: 200, 165, 130;
+  --color-navy: 75, 65, 55;
+  --color-navy-light: 100, 90, 80;
+}
+
+html.theme-dusk {
+  --color-ink: 35, 40, 50;
+  --color-paper: 244, 246, 248;
+  --color-sage: 145, 155, 165;
+  --color-moss: 110, 120, 135;
+  --color-amber: 185, 170, 165;
+  --color-navy: 50, 60, 75;
+  --color-navy-light: 75, 85, 100;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+@layer base {
+  button:not(:disabled),
+  a,
+  article,
+  .choice-card,
+  .suggestion {
+    transition: filter 0.15s ease-out;
+  }
+  
+  button:not(:disabled):hover,
+  a:hover,
+  article:hover,
+  .choice-card:hover,
+  .suggestion:hover {
+    filter: brightness(0.96);
+  }
+  
+  button:not(:disabled):active,
+  a:active,
+  article:active,
+  .choice-card:active,
+  .suggestion:active {
+    filter: brightness(0.92);
+    filter: brightness(0.92);
+    transition-duration: 0s;
+  }
+}
+
+/* Custom Scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(var(--color-navy), 0.2) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(var(--color-navy), 0.2);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(var(--color-navy), 0.4);
+}

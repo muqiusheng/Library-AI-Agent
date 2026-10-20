@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "WenQuanYi Micro Hei", sans-serif;
+    background: #FFFFFF;
+    color: #1E293B;
+    padding: 30px 40px;
+    width: 1400px;
+    margin: 0 auto;
+  }
+  .main-title {
+    text-align: center;
+    font-size: 26px;
+    font-weight: 800;
+    color: #0F172A;
+    letter-spacing: 1px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+  .main-title .badge {
+    background: #0B5394;
+    color: #FFF;
+    font-size: 13px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+  
+  /* Layer Card */
+  .layer-container {
+    border-radius: 10px;
+    margin-bottom: 14px;
+    background: #FFFFFF;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    position: relative;
+  }
+  .layer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 9px 18px;
+    color: #FFFFFF;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+  .layer-header .left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .layer-header .icon {
+    width: 19px;
+    height: 19px;
+    stroke: #FFF;
+    display: flex;
+    align-items: center;
+  }
+  .layer-header .tech-tag {
+    font-size: 12px;
+    font-weight: 500;
+    opacity: 0.92;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 2px 9px;
+    border-radius: 12px;
+  }
+  .layer-body {
+    padding: 12px 16px;
+    display: grid;
+    gap: 12px;
+    background: #FAFAFC;
+  }
+
+  /* Module Card inside Layer */
+  .sub-card {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+  }
+  .sub-card-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #0F172A;
+    margin-bottom: 7px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .sub-card-title .mark {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 800;
+    color: #FFF;
+  }
+  .sub-card-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .item-pill {
+    background: #F1F5F9;
+    border: 1px solid #E2E8F0;
+    padding: 4px 10px;
+    border-radius: 5px;
+    font-size: 12px;
+    color: #334155;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .item-pill svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* Color Schemes */
+  /* Layer 1: Navy Blue */
+  .theme-navy { border: 1.5px solid #1E40AF; }
+  .theme-navy .layer-header { background: #1E40AF; }
+  .theme-navy .sub-card { border-left: 3px solid #1E40AF; }
+  .theme-navy .mark { background: #1E40AF; }
+  .theme-navy .item-pill svg { stroke: #1E40AF; }
+  
+  /* Layer 2: Cobalt/Cyan Blue */
+  .theme-cobalt { border: 1.5px solid #0284C7; }
+  .theme-cobalt .layer-header { background: #0284C7; }
+  .theme-cobalt .sub-card { border-left: 3px solid #0284C7; }
+  .theme-cobalt .mark { background: #0284C7; }
+  .theme-cobalt .item-pill svg { stroke: #0284C7; }
+
+  /* Layer 3: Deep Teal / Peacock Green (CORE) */
+  .theme-teal { border: 1.5px solid #0D9488; }
+  .theme-teal .layer-header { background: #0D9488; }
+  .theme-teal .sub-card { border-left: 3px solid #0D9488; }
+  .theme-teal .mark { background: #0D9488; }
+  .theme-teal .item-pill svg { stroke: #0D9488; }
+
+  /* Layer 4: Warm Amber / Orange */
+  .theme-orange { border: 1.5px solid #EA580C; }
+  .theme-orange .layer-header { background: #EA580C; }
+  .theme-orange .sub-card { border-left: 3px solid #EA580C; }
+  .theme-orange .mark { background: #EA580C; }
+  .theme-orange .item-pill svg { stroke: #EA580C; }
+
+  /* Connectors */
+  .flow-arrow {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 14px;
+    margin-top: -6px;
+    margin-bottom: 2px;
+    color: #94A3B8;
+  }
+  .flow-arrow svg {
+    width: 20px;
+    height: 14px;
+    stroke: #94A3B8;
+  }
+
+  /* Bottom Breadcrumb Bar */
+  .bottom-bar {
+    margin-top: 14px;
+    background: #F8FAFC;
+    border: 1px dashed #0D9488;
+    border-radius: 8px;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 13px;
+    color: #334155;
+  }
+  .bottom-bar .tag {
+    background: #0D9488;
+    color: white;
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 700;
+    margin-right: 10px;
+  }
+  .bottom-bar .highlight {
+    color: #EA580C;
+    font-weight: 700;
+  }
+</style>
+</head>
+<body>
+
+  <div class="main-title">
+    <span>书途智启 (BookPath AI) 系统四层架构全景图</span>
+    <span class="badge">技术路线与系统架构</span>
+  </div>
+
+  <!-- Layer 1: 用户交互层 -->
+  <div class="layer-container theme-navy">
+    <div class="layer-header">
+      <div class="left">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>
+        <span>第 1 层：用户交互层 (User Presentation Layer)</span>
+      </div>
+      <span class="tech-tag">Vue 3 + TypeScript + TailwindCSS + Pinia</span>
+    </div>
+    <div class="layer-body" style="grid-template-columns: 1fr 1fr;">
+      <div class="sub-card">
+        <div class="sub-card-title">
+          <span class="mark">1</span>
+          <span>学生工作台 (Student Workspace)</span>
+        </div>
+        <div class="sub-card-items">
+          <span class="item-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> 多轮自然语言对话</span>
+          <span class="item-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg> 智能书籍推荐卡片</span>
+          <span class="item-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg> 三阶段研习路径</span>
+          <span class="item-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg> 模拟预约通知交互</span>
+        </div>
+      </div>
+      <div class="sub-card">
+        <div class="sub-card-title">
+          <span class="mark">2</span>
+          <span>管理运营中台 (Admin Operation Center)</span>
+        </div>
+        <div class="sub-card-items">
+          <span class="item-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg> 馆藏Excel清洗导入</span>
+          <span class="item-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> AI多标签精准审核</span>
+          <span class="item-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg> 向量索引构建与同步</span>
+          <span class="item-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg> 实时多维数据看板</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-arrow">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
+  </div>
+
+  <!-- Layer 2: 接口网关层 -->
+  <div class="layer-container theme-cobalt">
+    <div class="layer-header">
+      <div class="left">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+        <span>第 2 层：接口网关与安全屏障 (API Gateway & Security Layer)</span>
+      </div>
+      <span class="tech-tag">FastAPI Gateway + Pydantic v2 + OAuth2</span>
+    </div>
+    <div class="layer-body" style="grid-template-columns: 1fr 1fr;">
+      <div class="sub-card">
+        <div class="sub-card-title">
+          <span class="mark">A</span>
+          <span>安全与统一鉴权中心</span>
+        </div>
+        <div class="sub-card-items">
+          <span class="item-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Argon2id 工业级密码哈希</span>
+          <span class="item-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="15.5" r="4.5"/><path d="m21 3-9.5 9.5"/><path d="m15.5 7.5 3 3M18 5l3 3"/></svg> JWT HS256 无状态鉴权</span>
+          <span class="item-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> RBAC 双角色权限严格隔离</span>
+        </div>
+      </div>
+      <div class="sub-card">
+        <div class="sub-card-title">
+          <span class="mark">B</span>
+          <span>流量守卫与流式传输网关</span>
+        </div>
+        <div class="sub-card-items">
+          <span class="item-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg> 滑动窗口高并发接口限流</span>
+          <span class="item-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> CORS 严格跨域域名白名单</span>
+          <span class="item-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg> SSE (Server-Sent Events) 逐字流式长连接</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-arrow">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
+  </div>
+
+  <!-- Layer 3: 业务服务与AI集成层 (CORE) -->
+  <div class="layer-container theme-teal">
+    <div class="layer-header">
+      <div class="left">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg></div>
+        <span>第 3 层：核心业务服务与 AI 引擎中枢 (Core Service & AI Engine Layer)</span>
+      </div>
+      <span class="tech-tag">DeepSeek-V3 / R1 + BGE-zh-v1.5 + LangChain / LlamaIndex</span>
+    </div>
+    <div class="layer-body" style="grid-template-columns: 1.1fr 0.9fr 1fr;">
+      <div class="sub-card">
+        <div class="sub-card-title">
+          <span class="mark">A</span>
+          <span>推荐与学习路径核心引擎</span>
+        </div>
+        <div class="sub-card-items">
+          <span class="item-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg> 3类高精意图分类器</span>
+          <span class="item-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg> 6维度量化打分体系</span>
+          <span class="item-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg> 基础/进阶/精通三阶规划</span>
+        </div>
+      </div>
+      <div class="sub-card">
+        <div class="sub-card-title">
+          <span class="mark">B</span>
+          <span>用户动态画像记忆中枢</span>
+        </div>
+        <div class="sub-card-items">
+          <span class="item-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> 知识掌握置信度提取</span>
+          <span class="item-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> 阅读偏好自适应演进</span>
+          <span class="item-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> 敏感隐私数据沙箱锁</span>
+        </div>
+      </div>
+      <div class="sub-card">
+        <div class="sub-card-title">
+          <span class="mark">C</span>
+          <span>大模型与向量集成适配器</span>
+        </div>
+        <div class="sub-card-items">
+          <span class="item-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg> DeepSeek 深度链式推理</span>
+          <span class="item-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg> BGE-zh 稠密语义向量召回</span>
+          <span class="item-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> 幻觉抑制与格式严约束校验</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-arrow">
+    <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
+  </div>
+
+  <!-- Layer 4: 数据持久化层 -->
+  <div class="layer-container theme-orange">
+    <div class="layer-header">
+      <div class="left">
+        <div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></div>
+        <span>第 4 层：数据持久化与知识底座 (Data Persistence & Knowledge Base)</span>
+      </div>
+      <span class="tech-tag">PostgreSQL 16 + ChromaDB + Local WAL Cache</span>
+    </div>
+    <div class="layer-body" style="grid-template-columns: 1fr 1fr;">
+      <div class="sub-card">
+        <div class="sub-card-title">
+          <span class="mark">1</span>
+          <span>PostgreSQL 16 关系型核心数据库</span>
+        </div>
+        <div class="sub-card-items">
+          <span class="item-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> 用户鉴权与角色账户</span>
+          <span class="item-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg> 结构化标准馆藏书目</span>
+          <span class="item-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> 借还物理状态与事务流水</span>
+          <span class="item-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> 对话上下文与审计日志</span>
+        </div>
+      </div>
+      <div class="sub-card">
+        <div class="sub-card-title">
+          <span class="mark">2</span>
+          <span>Chroma 高性能向量数据库</span>
+        </div>
+        <div class="sub-card-items">
+          <span class="item-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg> 图书稠密语义向量索引 (768维)</span>
+          <span class="item-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> 近邻余弦相似度 (HNSW) 极速检索</span>
+          <span class="item-pill"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> 增量嵌入与元数据多条件联合过滤</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 底部说明栏 -->
+  <div class="bottom-bar">
+    <div>
+      <span class="tag">高可用容灾与可信机制</span>
+      <span><strong>全链路容错降级链条：</strong>当外部商业大模型 API 出现网络抖动或未配置时，系统自动无缝切换至内部启发式规则与本地向量库，<span class="highlight">仍可 100% 独立闭环完成高质量图书推荐</span>。</span>
+    </div>
+    <div style="font-weight: 700; color: #0D9488;">
+      零幻觉 · 可溯源 · 高可靠
+    </div>
+  </div>
+
+</body>
+</html>
