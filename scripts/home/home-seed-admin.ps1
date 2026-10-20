@@ -6,7 +6,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$root = Split-Path -Parent $PSScriptRoot
+$root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $composePath = Join-Path $root 'docker-compose.home.yml'
 
 if (-not (Test-Path -LiteralPath $DockerPath)) {

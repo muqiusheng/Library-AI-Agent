@@ -36,11 +36,11 @@ default = true
 [tool.pyright]
 venvPath = "."
 venv = ".venv"
-include = ["app"]
+include = ["app", "tests"]
 extraPaths = ["."]
 
 [tool.pytest.ini_options]
-testpaths = ["app/tests"]
+testpaths = ["tests"]
 pythonpath = ["."]
 
 [tool.ruff]

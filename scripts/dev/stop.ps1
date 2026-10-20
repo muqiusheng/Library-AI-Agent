@@ -1,4 +1,4 @@
-$Root = Split-Path -Parent $PSScriptRoot
+$Root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $PidFile = Join-Path $Root ".bookpath-pids"
 if (Test-Path $PidFile) {
   Get-Content $PidFile | ForEach-Object { Stop-Process -Id ([int]$_) -Force -ErrorAction SilentlyContinue }

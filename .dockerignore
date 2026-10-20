@@ -17,3 +17,5 @@ data
 uploads
 library_data.db
 docs
+resources
+tests
