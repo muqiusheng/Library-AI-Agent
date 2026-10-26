@@ -26,6 +26,7 @@ from app.core.config import get_settings
 from app.core.errors import install_exception_handlers
 from app.core.rate_limit import SlidingWindowRateLimiter, client_key, rule_for_request
 from app.db.session import SessionLocal
+from app.services.admin_seed import bootstrap_admin
 from app.services.system_config_service import SystemConfigService
 
 
@@ -35,6 +36,7 @@ async def lifespan(_: FastAPI):
     Path(settings.chroma_persist_directory).mkdir(parents=True, exist_ok=True)
     Path(settings.import_upload_directory).mkdir(parents=True, exist_ok=True)
     with SessionLocal() as session:
+        bootstrap_admin(session, settings)
         SystemConfigService(session).get_ai_provider_status()
     yield
 

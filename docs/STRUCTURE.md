@@ -40,10 +40,11 @@
 | `docs/competition/figures/` | 架构与推荐流程图的 HTML、PNG 和 PPTX |
 | `data/` | 本机 Chroma、上传文件、备份、运维日志与发布记录；整体被 Git 忽略 |
 
-容器运行数据仍使用 Compose 命名卷。根目录现有 `library_data.db`、`backend.log`、旧 `chroma_db/` 与 `.proxy-repair-backup/` 保留原位置，属于历史数据或本机维护遗留，不作为新文件的放置位置。本次不迁移现有数据库或重写持久化配置。新日志应放在 `data/` 下；`.venv/`、缓存、`frontend/node_modules/` 和 `frontend/dist/` 由各工具管理。
+容器运行数据仍使用 Compose 命名卷。历史 `library_data.db` 与 `backend.log` 已取消 Git 跟踪并加入忽略规则，本机文件保留，新部署不再分发这些运行数据；当前应用使用 PostgreSQL。其他旧检出拉取更新前如需保留历史副本，请先备份到 `data/legacy/`。旧 `chroma_db/` 与 `.proxy-repair-backup/` 属于本机维护遗留，不作为新文件的放置位置。现有数据库和持久化卷不迁移、不清空。新日志应放在 `data/` 下；`.venv/`、缓存、`frontend/node_modules/` 和 `frontend/dist/` 由各工具管理。
 
 ## 脚本与部署入口
 
+- 根目录 `start.cmd` / `stop.cmd`：Windows 双击启停，由 `scripts/launcher.ps1` 实现，自动选择已有家庭配置或本地 Docker 栈，保留配置与数据；见[快捷启动](./deployment/QUICK_START.md)。
 - `scripts/dev/`：本地启停、演示重置和质量验证。
 - `scripts/home/`：生产启停、环境初始化、健康检查、备份恢复、发布检查和 Windows 定时任务管理。
 - `scripts/network/`：Funnel 开启、关闭和状态检查。

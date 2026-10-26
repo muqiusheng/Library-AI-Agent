@@ -2,6 +2,8 @@
 
 本文面向第一次接触 Python、Vue 或 Docker 的用户，目标是让你在自己的电脑上完整启动书途智启。推荐优先使用“方式一：Docker Compose”，因为它不要求你单独安装 Python、Node.js 和 PostgreSQL。
 
+Windows 用户可先阅读[双击启动与初始账号](./QUICK_START.md)：安装 Docker Desktop 后双击根目录 `start.cmd`，停止时双击 `stop.cmd`。已有家庭配置会自动复用，首次缺少配置时才生成。
+
 目录职责与旧路径对照见 [项目结构说明](../STRUCTURE.md)，其他指南见 [文档导航](../README.md)。本文命令仍从仓库根目录执行。
 
 ## 1. 部署后会启动什么
@@ -55,13 +57,13 @@ Set-Location Library-AI-Agent
 复制公开的配置模板：
 
 ```powershell
-Copy-Item .env.example .env
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 ```
 
 macOS/Linux：
 
 ```bash
-cp .env.example .env
+[ -f .env ] || cp .env.example .env
 ```
 
 默认配置可以用于个人电脑上的本地开发。建议至少修改 `.env` 中的 `JWT_SECRET`，换成一个随机且不少于 32 个字符的值。例如可在 PowerShell 中生成：
@@ -94,7 +96,7 @@ docker compose ps
 alembic upgrade head
 ```
 
-因此新用户无需手工创建数据库表。
+因此新用户无需手工创建数据库表。随后应用仅在用户表为空时自动创建初始超级管理员；已有任意账号时跳过初始化。
 
 ### 2.5 验证服务
 
@@ -118,19 +120,30 @@ docker compose logs --tail 100 backend
 docker compose logs --tail 100 frontend
 ```
 
-### 2.6 创建第一个管理员
+### 2.6 初始超级管理员
 
-密码要求由后端校验。为避免密码出现在命令历史里，先保存为当前 PowerShell 进程的临时环境变量：
+全新本地空数据库首次启动后即可使用以下账号登录，无需手动执行创建命令：
+
+| 项目 | 默认值 |
+|---|---|
+| 用户名（学号） | `admin` |
+| 初始密码 | `BookPath@123` |
+
+登录后进入管理后台的用户管理，找到自己的账号并重置密码。首次启动前可修改 `.env` 中的 `BOOTSTRAP_ADMIN_STUDENT_NO` 和 `BOOTSTRAP_ADMIN_PASSWORD` 自定账号，密码为 8～16 位；`BOOTSTRAP_ADMIN_ENABLED=false` 可禁用自动创建。修改这些变量不会重置已有账号。
+
+**已有部署继续使用原账号与原密码。** 用户表存在任意账号时，自动初始化不创建账号、不覆盖密码、不改角色或账号状态。旧 Docker 卷、已有 PostgreSQL 和恢复的备份均会被保留；重新克隆代码不等于获得空数据库。
+
+如首次启动前已禁用自动初始化，可以继续手动创建管理员：
 
 ```powershell
-$env:BOOKPATH_ADMIN_PASSWORD = Read-Host "请输入管理员密码"
+$env:BOOKPATH_ADMIN_PASSWORD = Read-Host "请输入管理员密码（至少8位）"
 docker compose exec -e BOOKPATH_ADMIN_PASSWORD backend .venv/bin/python -m app.cli seed-admin --student-no admin --display-name "系统管理员"
 Remove-Item Env:BOOKPATH_ADMIN_PASSWORD
 ```
 
-看到 `admin admin: created` 表示创建成功；看到 `already exists` 表示账号已存在，命令不会覆盖原密码。随后可使用学号 `admin` 和刚才设置的密码登录。
+`admin admin: created` 表示新账号创建成功，此时使用刚输入的密码。`already exists` 表示原账号已存在，**本次输入的密码未生效**，应使用原密码；该命令不用于重置密码。自动初始化已创建默认账号时，再次运行该命令也会提示已存在。手动命令保留原有兼容行为：同名普通管理员会升级为超级管理员，原密码仍保留；自动初始化不会进行这种升级。
 
-> `docker compose exec` 在 Linux 容器中执行命令，所以容器内 Python 路径使用正斜杠 `.venv/bin/python`，即使宿主机是 Windows 也不要改成反斜杠。
+> 容器内 Python 路径为 `.venv/bin/python`，即使宿主机是 Windows 也使用正斜杠。
 
 ### 2.7 导入示例馆藏
 
@@ -181,6 +194,8 @@ docker compose up -d --build backend
 
 ### 2.9 日常启动、停止和更新
 
+Windows 可双击根目录 `start.cmd` / `stop.cmd`；更新代码后执行 `start.cmd -Rebuild`。启动器复用原配置和卷，停止入口仅执行对应栈的 `docker compose stop`。两种配置同时存在时，默认优先家庭栈，需本地栈时使用 `start.cmd -Mode Local`。更多参数见[快捷启动说明](./QUICK_START.md)。
+
 启动已有容器：
 
 ```powershell
@@ -216,7 +231,7 @@ docker compose up -d --build
 docker compose down -v
 ```
 
-仅在确认不需要现有数据时执行。再次 `docker compose up -d --build` 后会得到空数据库，需要重新创建管理员并导入馆藏。
+仅在确认不需要现有数据时执行。再次 `docker compose up -d --build` 后会创建初始超级管理员（除非禁用了自动初始化），其余业务数据为空，需要重新导入馆藏。日常快捷启动不会执行此重置操作。
 
 ## 3. 方式二：原生开发环境
 
@@ -245,7 +260,7 @@ docker compose version
 在项目根目录执行：
 
 ```powershell
-Copy-Item .env.example .env
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 uv sync
 Set-Location frontend
 npm ci
@@ -292,13 +307,9 @@ npm run dev
 
 ### 3.6 原生环境初始化账号与馆藏
 
-在第三个 PowerShell 窗口、项目根目录执行：
+原生后端同样在启动时自动检查用户表：空库创建 `.env` 中 `BOOTSTRAP_ADMIN_*` 指定的超级管理员，未配置时为 `admin` / `BookPath@123`；已有账号时保留原密码。修改密码使用管理后台的用户管理。若事先禁用自动初始化，可按 2.6 的手动方式创建，将命令前缀替换为 `uv run python -m app.cli seed-admin`。
 
-```powershell
-$env:BOOKPATH_ADMIN_PASSWORD = Read-Host "请输入管理员密码"
-uv run python -m app.cli seed-admin --student-no admin --display-name "系统管理员"
-Remove-Item Env:BOOKPATH_ADMIN_PASSWORD
-```
+在第三个 PowerShell 窗口、项目根目录执行以下馆藏命令。
 
 导入仓库内示例馆藏：
 
@@ -352,6 +363,9 @@ docker compose stop postgres
 
 | 变量 | 说明 |
 |---|---|
+| `BOOTSTRAP_ADMIN_ENABLED` | 默认 `true`；仅在用户表为空时自动创建初始超级管理员 |
+| `BOOTSTRAP_ADMIN_STUDENT_NO` | 默认 `admin`；初始用户名（学号），去除首尾空格后 1～64 字符 |
+| `BOOTSTRAP_ADMIN_PASSWORD` | 本地默认 `BookPath@123`；8～16 位，生产生成器使用随机值；不重置已有密码 |
 | `JWT_SECRET` | JWT 签名密钥；生产环境必须使用随机值 |
 | `JWT_ALGORITHM` | 默认 `HS256` |
 | `JWT_ACCESS_TOKEN_MINUTES` | Access Token 有效分钟数 |
@@ -385,6 +399,14 @@ Invoke-RestMethod http://localhost:8000/health
 ```
 
 ### 5.2 完整开发检查
+
+本次初始账号与快捷启动的独立回归不需要正在运行的数据库，可单独执行：
+
+```powershell
+uv run pytest tests/test_admin_bootstrap.py tests/test_admin_seed.py tests/test_config.py tests/test_launcher.py -q
+```
+
+`test_launcher.py` 在 Windows 上执行，在其他系统跳过。完整集成测试还需要可连接的 PostgreSQL、迁移后的表结构和已导入发布的馆藏；只迁移空库不足以通过馆藏相关测试。本次实际验收、已有旧测试接口问题及全仓静态检查限制见[部署变更验收记录](../development/DEPLOYMENT_ACCEPTANCE.md)。
 
 已按原生开发方式安装依赖后，可在 Windows PowerShell 执行：
 
@@ -480,7 +502,15 @@ docker compose up -d --force-recreate backend
 docker compose up -d --build frontend
 ```
 
-### 6.8 依赖下载慢或失败
+### 6.8 管理员提示 `already exists` 或初始密码无法登录
+
+- `already exists` 表示密码没有被覆盖。使用原密码，或让已登录的超级管理员从用户管理重置密码。
+- 初始凭据仅用于用户表为空的首次启动；用户表有任何账号时都会跳过。检查是否连接到已有 PostgreSQL、旧卷或恢复的备份。
+- 家庭生产配置生成器使用随机密码，查看本机 `.env.home` 的 `BOOTSTRAP_ADMIN_PASSWORD`，不要使用本地默认密码。
+- 不要为了登录而删除数据卷或覆盖 `.env`；`BOOTSTRAP_ADMIN_*` 不是密码重置开关。
+- 双击启动发现 `.env.home` 会选择家庭栈。若实际要访问本地开发栈，显式使用 `start.cmd -Mode Local`。
+
+### 6.9 依赖下载慢或失败
 
 - 确认浏览器可以访问 Docker Hub、GitHub 和包仓库。
 - 重新执行相同构建命令，Docker 会复用已经完成的缓存层。
@@ -499,7 +529,7 @@ Windows PowerShell：
 .\scripts\home\init-home-env.ps1
 ```
 
-脚本根据 `.env.home.example` 生成 `.env.home`，自动创建随机 PostgreSQL 密码和 JWT 密钥。为了防止误覆盖，已有 `.env.home` 时脚本会停止。
+脚本根据 `.env.home.example` 生成 `.env.home`，自动创建随机 PostgreSQL 密码、JWT 密钥和 16 位超级管理员初始密码。为了防止误覆盖，已有 `.env.home` 时脚本会停止。
 
 检查 `.env.home`，按需要配置：
 
@@ -508,9 +538,11 @@ Windows PowerShell：
 - `MAX_ACCOUNT_COUNT`：账号数量上限。
 - `DEEPSEEK_API_KEY` 与模型名称：可选模型服务。
 
-不要提交 `.env.home`。
+全新空库的用户名为 `admin`，密码查看本机 `.env.home` 的 `BOOTSTRAP_ADMIN_PASSWORD`；已有账号仍使用原密码。旧 `.env.home` 无需补写这些新变量，已有数据会使初始化自动跳过。不要提交 `.env.home`。
 
 ### 7.2 启动家庭服务器栈
+
+Windows 可执行 `start.cmd -Mode Home`，缺少 `.env.home` 时会自动生成；已有 `.env.home` 时直接双击 `start.cmd` 即可复用家庭栈。快捷入口不会修改 Funnel 配置；公网启停仍沿用 7.3 的原脚本。
 
 通用 Docker 命令：
 
@@ -712,7 +744,7 @@ Set-Location "D:\data\Java\lgh\vs code\Library-AI-Agent"
 
 1. 使用 HTTPS 反向代理，不直接暴露开发服务器。
 2. 只开放必要端口，不对公网开放 PostgreSQL `5432`。
-3. 限制管理员账号数量，使用强密码并妥善保存。
+3. 限制管理员账号数量，使用强密码并妥善保存；全新生产部署使用生成的随机初始密码，首次登录后在用户管理重置密码。
 4. 关闭自由注册，或启用足够长的注册邀请码。
 5. 定期备份 PostgreSQL、Chroma 和上传目录，并实际执行恢复演练。
 6. 配置日志轮转、磁盘空间和容器健康监控。
@@ -725,11 +757,11 @@ Set-Location "D:\data\Java\lgh\vs code\Library-AI-Agent"
 
 - [ ] `.env`、`.env.home` 和所有 API Key 未被 Git 跟踪。
 - [ ] 没有提交真实学生姓名、学号、密码、Token、访问日志或数据库备份。
-- [ ] 示例 Excel、SQLite 和知识库数据具备公开与再分发权限。
+- [ ] 示例 Excel 和知识库数据具备公开与再分发权限；历史 SQLite 数据库和运行日志不再随新代码分发。
 - [ ] `git log -p` 历史中没有曾经提交过的密钥；仅删除当前文件不能清除历史。
 - [ ] 已添加符合项目意图的 `LICENSE`。
 - [ ] README 中的仓库地址、作者、截图和联系方式已补充为最终信息。
 - [ ] 执行 `.\scripts\dev\verify.ps1` 并通过全部测试与构建。
 - [ ] 在一台没有本项目缓存的新电脑或虚拟机上按本文 Docker 步骤验证启动。
 
-完成以上步骤后，新用户应能通过“复制配置 → 启动容器 → 创建管理员 → 导入馆藏 → 构建标签与索引”的顺序，在本地得到可用的完整系统。
+完成以上步骤后，新用户应能通过“双击启动（或手动复制配置并启动容器）→ 使用初始管理员登录并改密 → 导入馆藏 → 构建标签与索引”的顺序，在本地得到可用的完整系统。

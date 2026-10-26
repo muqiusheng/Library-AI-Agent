@@ -4,6 +4,8 @@
 
 | 目录 | 脚本 | 用途 |
 |---|---|---|
+| 仓库根目录 | `start.cmd`、`stop.cmd` | Windows 双击启停，默认自动识别家庭或本地 Docker 栈 |
+| `scripts/` | `launcher.ps1` | 检查 Docker、补齐缺少的配置、等待服务就绪并打开浏览器 |
 | `dev/` | `start.ps1`、`stop.ps1` | 本地开发进程启停 |
 | `dev/` | `verify.ps1` | 后端 Pytest、Ruff，以及前端测试、类型检查和构建 |
 | `dev/` | `reset-demo.ps1` | 重置演示活动数据 |
@@ -29,4 +31,6 @@
 
 为兼容已安装的 Windows 定时任务，`scripts/` 根目录保留 `home-start.ps1`、`home-health.ps1`、`home-backup.ps1` 三个转发入口，参数与退出码传递给 `home/` 下的实现。新安装任务直接引用 `home/` 中的脚本，无需为本次整理重新注册已有任务。
 
-部署与数据操作细节见[部署指南](../docs/deployment/DEPLOYMENT.md)。本次目录整理未执行服务启停、任务注册、备份或恢复操作。
+双击入口的参数、初始账号和已有部署兼容规则见[快捷启动说明](../docs/deployment/QUICK_START.md)。`start.cmd -Rebuild` 用于更新镜像，`-Mode Local` / `-Mode Home` 指定部署栈，`-NoBrowser` 禁用自动打开网页。`stop.cmd` 只停止容器并保留持久化数据，不修改已有 Funnel 配置。原生开发仍使用 `dev/start.ps1`（后端 `8001`，与 Vite 代理一致）与 `dev/stop.ps1`。
+
+`home/init-home-env.ps1` 在新生成的 `.env.home` 中写入随机管理员初始密码；已有配置不会被覆盖。部署与数据操作细节见[部署指南](../docs/deployment/DEPLOYMENT.md)。

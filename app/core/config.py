@@ -2,7 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     jwt_secret: str = Field(default="change-me-before-deployment-32chars", min_length=32)
     jwt_algorithm: str = "HS256"
     jwt_access_token_minutes: int = 120
+
+    bootstrap_admin_enabled: bool = True
+    bootstrap_admin_student_no: str = "admin"
+    bootstrap_admin_password: SecretStr = SecretStr("BookPath@123")
 
     registration_enabled: bool = True
     registration_invite_code: str = ""

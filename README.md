@@ -4,7 +4,7 @@
 
 本项目不是让大模型凭空“编书单”：候选图书、馆藏状态和馆藏位置来自数据库，向量检索与规则负责召回和约束，大模型主要用于理解需求、组织说明和辅助生成标签。未配置大模型 API Key 时，系统仍可使用确定性降级方案完成基础推荐。
 
-> 想立即在本地运行？请阅读 [详细部署指南](./docs/deployment/DEPLOYMENT.md)。推荐新手使用 Docker Desktop，一条命令即可启动前端、后端和 PostgreSQL。
+> Windows 用户安装 Docker Desktop 后，双击根目录 `start.cmd` 即可启动并打开网页，双击 `stop.cmd` 停止。全新本地空库的超级管理员为 `admin` / `BookPath@123`，已有部署保留原账号密码。见[快捷启动与初始账号](./docs/deployment/QUICK_START.md)或[详细部署指南](./docs/deployment/DEPLOYMENT.md)。
 
 ## 核心能力
 
@@ -104,6 +104,7 @@ Library-AI-Agent/
 ├─ Dockerfile              # 后端镜像构建入口
 ├─ docker-compose.yml      # 本地 Docker 开发栈
 ├─ docker-compose.home.yml # 家庭服务器生产栈
+├─ start.cmd / stop.cmd    # Windows 双击启停入口
 ├─ CONTRIBUTING.md         # 协作与 Git 工作流
 └─ README.md               # 项目介绍与快速开始
 ```
@@ -112,16 +113,20 @@ Library-AI-Agent/
 
 ## 快速开始
 
-已安装 Git 与 Docker Desktop 的用户可执行：
+Windows 用户下载项目后，双击根目录 `start.cmd` 即可。启动器会检查 Docker、仅在缺少配置时创建配置，并在服务就绪后自动打开浏览器。已有 `.env.home` 时自动复用家庭栈，否则使用本地栈。更新代码后执行 `start.cmd -Rebuild`。
+
+也可手动运行 Docker Compose：
 
 ```powershell
 git clone <你的 GitHub 仓库地址>
 Set-Location Library-AI-Agent
-Copy-Item .env.example .env
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 docker compose up -d --build
 ```
 
-打开 <http://localhost:4173>。首次启动只创建数据库表，若要看到真实推荐结果，还需导入示例馆藏、生成标签和索引。完整命令、管理员创建、故障排查、原生开发和生产部署均在 [部署指南](./docs/deployment/DEPLOYMENT.md) 中说明。
+打开 <http://localhost:4173>。首次启动会迁移数据库，并且仅在用户表为空时创建超级管理员：用户名（学号）`admin`，初始密码 `BookPath@123`。登录后请在用户管理中重置密码。家庭生产配置生成器使用随机初始密码，查看 `.env.home` 的 `BOOTSTRAP_ADMIN_PASSWORD`。已有任何账号时跳过初始化，不覆盖原账号、密码、角色和业务数据。
+
+要看到真实推荐结果，还需导入馆藏、生成标签和索引。初始账号定制、旧部署兼容和双击启停见[快捷启动说明](./docs/deployment/QUICK_START.md)；完整命令、故障排查、原生开发和生产部署见[部署指南](./docs/deployment/DEPLOYMENT.md)。
 
 ## 常用地址
 
