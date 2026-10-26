@@ -105,6 +105,7 @@ Library-AI-Agent/
 ├─ docker-compose.yml      # 本地 Docker 开发栈
 ├─ docker-compose.home.yml # 家庭服务器生产栈
 ├─ start.cmd / stop.cmd    # Windows 双击启停入口
+├─ reset-admin-password.cmd # 忘记超级管理员密码时的恢复入口
 ├─ CONTRIBUTING.md         # 协作与 Git 工作流
 └─ README.md               # 项目介绍与快速开始
 ```
@@ -125,6 +126,8 @@ docker compose up -d --build
 ```
 
 打开 <http://localhost:4173>。首次启动会迁移数据库，并且仅在用户表为空时创建超级管理员：用户名（学号）`admin`，初始密码 `BookPath@123`。登录后请在用户管理中重置密码。家庭生产配置生成器使用随机初始密码，查看 `.env.home` 的 `BOOTSTRAP_ADMIN_PASSWORD`。已有任何账号时跳过初始化，不覆盖原账号、密码、角色和业务数据。
+
+忘记超级管理员密码时，先启动系统，再双击根目录 `reset-admin-password.cmd`，或在终端运行 `.\reset-admin-password.cmd`，按提示隐藏输入两次新密码即可；无需原密码或重建镜像，保留其他账号和业务数据。详见[密码恢复步骤](./docs/deployment/QUICK_START.md#忘记超级管理员密码)。
 
 要看到真实推荐结果，还需导入馆藏、生成标签和索引。初始账号定制、旧部署兼容和双击启停见[快捷启动说明](./docs/deployment/QUICK_START.md)；完整命令、故障排查、原生开发和生产部署见[部署指南](./docs/deployment/DEPLOYMENT.md)。
 

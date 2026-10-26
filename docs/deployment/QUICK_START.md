@@ -54,6 +54,31 @@ BOOTSTRAP_ADMIN_PASSWORD=你的8至16位密码
 
 快捷入口管理容器，不新增或修改 Tailscale Funnel 配置。需要启用公网或撤销已有公网入口时，继续使用原来的 `scripts/home/home-start.ps1` / `home-stop.ps1` 和网络脚本；见[家庭服务器部署](./DEPLOYMENT.md#7-家庭服务器生产部署)。
 
+## 忘记超级管理员密码
+
+先用 `start.cmd` 启动对应系统，再双击根目录 `reset-admin-password.cmd`，或在项目根目录的 PowerShell 中执行：
+
+```powershell
+.\reset-admin-password.cmd
+```
+
+脚本默认重置用户名 `admin` 的超级管理员密码，无需原密码。它沿用启动器的识别规则：有 `.env.home` 时默认选择家庭部署，否则选择本地部署。请核对窗口中的部署方式和用户名。
+
+1. 出现 `New password (8-16 characters):` 时输入新密码，长度为 8～16 位。
+2. 出现 `Confirm password:` 时再输入一次。输入时屏幕不显示字符，这是正常现象。
+3. 出现 `Password updated for super-admin: admin` 表示成功，随后使用 `admin` 与新密码登录。双击入口会保留窗口，按任意键关闭。
+
+如果账号名称或部署方式不同，可以指定：
+
+```powershell
+.\reset-admin-password.cmd -Mode Home -StudentNo admin
+.\reset-admin-password.cmd -Mode Local -StudentNo owner
+```
+
+不需要重建镜像。脚本只修改指定超级管理员的密码哈希，保留原有账号角色、启用状态、其他账号、馆藏及业务记录；不会创建账号、清空数据库或覆盖环境文件。账号不存在、角色不符、密码长度不合格、两次输入不同或取消输入时不会重置密码。被停用的账号不会因此自动启用。
+
+此功能供拥有服务器本机与 Docker 管理权限的维护者使用，请在交互式终端中操作。密码不进入命令参数、终端输出或配置文件。重置后 `.env.home` 中的 `BOOTSTRAP_ADMIN_PASSWORD` 仍是首次初始化值，不会变成新密码；后续登录以此次新密码为准。
+
 ## 为什么提示账号已经存在
 
 `seed-admin` 的 `already exists` 表示账号已存在，刚刚输入的密码**没有覆盖原密码**。自动初始化后再次运行它也会得到这个结果。请使用原密码登录；能登录的超级管理员可在用户管理中重置密码。

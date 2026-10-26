@@ -5,6 +5,8 @@
 | 目录 | 脚本 | 用途 |
 |---|---|---|
 | 仓库根目录 | `start.cmd`、`stop.cmd` | Windows 双击启停，默认自动识别家庭或本地 Docker 栈 |
+| 仓库根目录 | `reset-admin-password.cmd` | 双击或终端重置指定超级管理员密码，保留其他数据 |
+| `scripts/` | `reset-admin-password.ps1`、`reset_admin_password.py` | 识别部署栈，在现有容器中隐藏输入并重置密码，无需重建镜像 |
 | `scripts/` | `launcher.ps1` | 检查 Docker、补齐缺少的配置、等待服务就绪并打开浏览器 |
 | `dev/` | `start.ps1`、`stop.ps1` | 本地开发进程启停 |
 | `dev/` | `verify.ps1` | 后端 Pytest、Ruff，以及前端测试、类型检查和构建 |
@@ -34,3 +36,5 @@
 双击入口的参数、初始账号和已有部署兼容规则见[快捷启动说明](../docs/deployment/QUICK_START.md)。`start.cmd -Rebuild` 用于更新镜像，`-Mode Local` / `-Mode Home` 指定部署栈，`-NoBrowser` 禁用自动打开网页。`stop.cmd` 只停止容器并保留持久化数据，不修改已有 Funnel 配置。原生开发仍使用 `dev/start.ps1`（后端 `8001`，与 Vite 代理一致）与 `dev/stop.ps1`。
 
 `home/init-home-env.ps1` 在新生成的 `.env.home` 中写入随机管理员初始密码；已有配置不会被覆盖。部署与数据操作细节见[部署指南](../docs/deployment/DEPLOYMENT.md)。
+
+忘记密码时先启动系统，再运行 `.\reset-admin-password.cmd`；默认账号为 `admin`，支持 `-Mode Home` / `-Mode Local` 和 `-StudentNo 用户名`。密码输入两次且不会显示，详细提示及兼容规则见[密码恢复步骤](../docs/deployment/QUICK_START.md#忘记超级管理员密码)。

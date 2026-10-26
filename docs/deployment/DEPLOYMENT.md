@@ -510,6 +510,14 @@ docker compose up -d --build frontend
 - 不要为了登录而删除数据卷或覆盖 `.env`；`BOOTSTRAP_ADMIN_*` 不是密码重置开关。
 - 双击启动发现 `.env.home` 会选择家庭栈。若实际要访问本地开发栈，显式使用 `start.cmd -Mode Local`。
 
+如果已经忘记原超级管理员密码，先启动系统，再在 Windows 项目根目录执行：
+
+```powershell
+.\reset-admin-password.cmd
+```
+
+按提示隐藏输入并确认 8～16 位新密码，默认处理 `admin`；指定其他账号或部署栈可用 `.\reset-admin-password.cmd -Mode Home -StudentNo admin`。也可直接双击该文件。无需重建镜像，保留其他账号和业务数据，失败或取消时不会创建账号或重置环境。完整说明见[密码恢复步骤](./QUICK_START.md#忘记超级管理员密码)。
+
 ### 6.9 依赖下载慢或失败
 
 - 确认浏览器可以访问 Docker Hub、GitHub 和包仓库。

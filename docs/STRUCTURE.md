@@ -45,6 +45,7 @@
 ## 脚本与部署入口
 
 - 根目录 `start.cmd` / `stop.cmd`：Windows 双击启停，由 `scripts/launcher.ps1` 实现，自动选择已有家庭配置或本地 Docker 栈，保留配置与数据；见[快捷启动](./deployment/QUICK_START.md)。
+- 根目录 `reset-admin-password.cmd`：密码恢复入口，由 `scripts/reset-admin-password.ps1` 将 `scripts/reset_admin_password.py` 送入已有后端容器执行，隐藏输入新密码，无需重建镜像。
 - `scripts/dev/`：本地启停、演示重置和质量验证。
 - `scripts/home/`：生产启停、环境初始化、健康检查、备份恢复、发布检查和 Windows 定时任务管理。
 - `scripts/network/`：Funnel 开启、关闭和状态检查。

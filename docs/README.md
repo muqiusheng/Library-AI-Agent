@@ -3,7 +3,7 @@
 | 要做什么 | 阅读位置 |
 |---|---|
 | 了解系统能力、架构与快速启动 | [项目首页](../README.md) |
-| 双击启停、初始管理员、已有部署升级 | [快捷启动与初始账号](./deployment/QUICK_START.md) |
+| 双击启停、初始管理员、忘记密码与已有部署升级 | [快捷启动与初始账号](./deployment/QUICK_START.md) |
 | 核对初始化与快捷启动的验证结果和测试限制 | [部署变更验收记录](./development/DEPLOYMENT_ACCEPTANCE.md) |
 | 查找目录职责和旧路径的新位置 | [项目结构说明](./STRUCTURE.md) |
 | 安装环境、导入馆藏、部署或排错 | [部署指南](./deployment/DEPLOYMENT.md) |
