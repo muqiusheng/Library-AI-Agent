@@ -1,6 +1,8 @@
 # 代码拉取、推送与项目协作指南
 
-适用仓库：`https://github.com/muqiusheng/Library-AI-Agent.git`。命令默认使用 Windows PowerShell，在仓库根目录执行；分支名、Issue 编号和文件路径示例应按任务替换。
+适用仓库：`https://github.com/deloisewampler8101987ted-ux/Library-AI-Agent.git`。命令默认使用 Windows PowerShell，在仓库根目录执行；分支名、Issue 编号和文件路径示例应按任务替换。
+
+2026-10-29 状态更新：远程默认分支已是 `main`，当前远程还有 `chore/repository-standardization` 和 `docs/collaboration-guide`。前者的提交历史已包含在主线，后者还有 4 个主线未包含的提交，涉及部署、快捷启停及管理员密码重置。新手操作和最新分支说明见 [Git 协作与分支操作指南](./docs/development/GIT_COLLABORATION_GUIDE.md)。下文第 2、7 节保留 2026-10-20 的迁移背景；其中“本次”“当前”等指迁移当时，相关改名和删除示例不应作为今天的待办再次执行。
 
 准备开发下一项功能或发布新版本时，请按 [项目迭代实操指南](./docs/development/ITERATION.md) 执行。指南覆盖首次主线交接、需求验收、分层实现、数据库迁移、测试评审、版本发布、回滚和紧急修复。
 
@@ -31,7 +33,7 @@ main ──●──────────────────────
 
 每个分支只解决一个明确问题，尽量在数天内完成。环境差异使用配置管理，发布版本使用标签，不用 `main01`、`main02` 等名称表达版本。`hotfix` 通常从 `main` 创建；若线上版本落后于主线，应从对应发布标签创建，并安排修复回流主线。
 
-## 2. 当前仓库的迁移状态
+## 2. 2026-10-20 仓库迁移记录
 
 2026-10-20，本地当前分支由 `codex/github-public` 改为 `chore/repository-standardization`，定位为仓库规范化与既有系统交付的集成分支。改名只改变引用名称，不改变提交内容。
 
@@ -56,7 +58,7 @@ git ls-remote --heads origin
 准备 Git、Python 3.12+、uv，以及满足项目构建要求的 Node.js/npm。安装和运行细节见 [部署指南](./docs/deployment/DEPLOYMENT.md)。
 
 ```powershell
-git clone https://github.com/muqiusheng/Library-AI-Agent.git
+git clone https://github.com/deloisewampler8101987ted-ux/Library-AI-Agent.git
 Set-Location Library-AI-Agent
 git remote -v
 git branch -vv
@@ -170,7 +172,7 @@ git branch -d feat/123-reading-progress
 
 Squash 合并生成新提交，`git branch -d` 可能拒绝删除旧分支。这时先确认 GitHub PR 已合并、代码已包含在主线，且没有遗留提交；确认后才手动用 `git branch -D <任务分支>` 删除。远程任务分支可在 PR 合并页面删除。
 
-## 7. 分支改名与旧成员迁移
+## 7. 历史分支改名与旧成员迁移
 
 本次本地和远程均已改名，上游关联已更新，不需要再次推送来完成改名。将来仅在本地改名、尚未发布同名远程分支时，可在当前分支执行：
 
