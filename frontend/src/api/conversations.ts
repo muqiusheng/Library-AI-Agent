@@ -1,5 +1,5 @@
 import { API_BASE_URL, apiClient, type ApiEnvelope } from '@/api/client'
-import type { ConversationSummary, MessageDto, StreamEvent } from '@/types/conversation'
+import type { ConversationConstraints, ConversationSummary, MessageDto, StreamEvent } from '@/types/conversation'
 import type { RecommendationSetData } from '@/types/recommendation'
 
 export async function listConversations(): Promise<ConversationSummary[]> {
@@ -29,6 +29,11 @@ export async function listMessages(id: string): Promise<MessageDto[]> {
   return response.data.data
 }
 
+export async function getConstraints(id: string): Promise<ConversationConstraints> {
+  const response = await apiClient.get<ApiEnvelope<ConversationConstraints>>(`/conversations/${id}/constraints`)
+  return response.data.data
+}
+
 export async function getRecommendation(id: string): Promise<RecommendationSetData> {
   const response = await apiClient.get<ApiEnvelope<RecommendationSetData>>(`/recommendations/${id}`)
   return response.data.data
@@ -36,7 +41,7 @@ export async function getRecommendation(id: string): Promise<RecommendationSetDa
 
 export async function streamMessage(
   conversationId: string,
-  payload: { content: string; only_available: boolean },
+  payload: { content: string; only_available?: boolean },
   onEvent: (event: StreamEvent) => void,
   signal?: AbortSignal
 ): Promise<void> {

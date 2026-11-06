@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -46,6 +46,7 @@ class ConversationService:
             role=MessageRole.USER,
             content=content,
             message_type=MessageType.TEXT,
+            created_at=self._message_time(conversation),
         )
         self.session.add(message)
         if conversation.title == "新会话":
@@ -66,6 +67,7 @@ class ConversationService:
             content=content,
             message_type=MessageType.RECOMMENDATION,
             structured_payload={"recommendation_set_id": str(recommendation_set_id)},
+            created_at=self._message_time(conversation),
         )
         self.session.add(message)
         self.repository.touch(conversation)
@@ -78,8 +80,20 @@ class ConversationService:
             role=MessageRole.ASSISTANT,
             content=content,
             message_type=MessageType.TEXT,
+            created_at=self._message_time(conversation),
         )
         self.session.add(message)
         self.repository.touch(conversation)
         self.session.commit()
         return message
+
+    @staticmethod
+    def _message_time(conversation: Conversation) -> datetime:
+        # Rapid turns can share the same clock tick on Windows; retain insertion order.
+        now = datetime.now(UTC)
+        previous = conversation.updated_at
+        if previous is not None:
+            previous = previous.replace(tzinfo=UTC) if previous.tzinfo is None else previous
+            now = max(now, previous + timedelta(microseconds=1))
+        conversation.updated_at = now
+        return now

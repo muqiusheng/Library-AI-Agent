@@ -1,35 +1,19 @@
-import json
-import re
-from dataclasses import dataclass
+import logging
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
-from app.db.models import MemorySource, Message, ProfileMemory, User
-from app.integrations.llm.deepseek import DeepSeekError, DeepSeekProvider
+from app.db.models import MemorySource, Message, MessageRole, ProfileMemory, User
+from app.integrations.llm.deepseek import DeepSeekProvider
+from app.repositories.conversation_repository import ConversationRepository
 from app.repositories.profile_repository import ProfileRepository
 from app.schemas.profile import ProfileUpdate
+from app.services.profile_fact_extractor import ExtractedMemory, ProfileExtraction, validate_fact
 
-class ProfileFact(BaseModel):
-    category: str = Field(description="Must be 'foundation', 'learning_goals', 'interests', 'difficulty_preference', 'major', or 'grade'")
-    key: str = Field(description="A unique key, e.g. 'topic:机器学习'")
-    value_json: str = Field(description="The extracted value serialized as a JSON string. For foundation, e.g. '{\"topic\": \"机器学习\", \"level\": \"none\", \"label\": \"零基础\"}'")
-    confidence: float = Field(description="Confidence score between 0.0 and 1.0")
+logger = logging.getLogger(__name__)
 
-class ProfileExtraction(BaseModel):
-    facts: list[ProfileFact]
-
-
-
-@dataclass(frozen=True)
-class ExtractedMemory:
-    category: str
-    key: str
-    value: dict[str, Any] | list[Any] | str | int | float | bool
-    confidence: float
 
 class ProfileMemoryService:
     def __init__(self, session: Session, provider: DeepSeekProvider | None = None) -> None:
@@ -38,7 +22,19 @@ class ProfileMemoryService:
         self.provider = provider or DeepSeekProvider()
 
     async def extract_from_message(self, user: User, message: Message) -> list[ProfileMemory]:
-        extracted = await self._extract_async(message.content)
+        if message.role != MessageRole.USER or not self.provider.available:
+            return []
+        history = [
+            {"role": item.role.value, "content": item.content}
+            for item in ConversationRepository(self.session).recent_messages(
+                message.conversation_id,
+                user.id,
+                limit=8,
+                before=message.created_at,
+            )
+            if item.role in {MessageRole.USER, MessageRole.ASSISTANT}
+        ]
+        extracted = await self._extract_async(message.content, history=history)
         created = []
         for value in extracted:
             memory = self._replace_active(
@@ -137,41 +133,60 @@ class ProfileMemoryService:
         self.session.flush()
         return memory
 
-    async def _extract_async(self, text: str) -> list[ExtractedMemory]:
+    async def _extract_async(
+        self, text: str, *, history: list[dict[str, str]] | None = None
+    ) -> list[ExtractedMemory]:
         if not self.provider.available:
             return []
-            
+
+        history = history or []
         system_prompt = (
-            "Analyze the user's message and extract any facts about their learning profile. "
-            "Categories can be 'foundation' (what they already know or don't know, e.g., '懂机器学习', '没学过Python'), "
-            "'learning_goals' (what they want to learn, e.g., '想学Agent', '考研'), "
-            "'interests' (topics they like), 'difficulty_preference' (beginner/progressive/intermediate/advanced), "
-            "'major' (their university major), or 'grade' (their year/grade). "
-            "Return an empty list if no clear facts are found. "
-            "For 'foundation', include level ('none', 'basic', 'intermediate', 'advanced')."
+            "提取当前用户消息明确陈述的本人学习事实，历史只用于指代和短回答消歧。"
+            "不能重新提取历史事实，不能将助手的推测作为用户事实。evidence 必须原样摘自当前消息。"
+            "逐条标明 subject=user/other/unclear、scope=persistent/task/hypothetical/unclear。"
+            "朋友、同学的信息属于 other；本次荐书要求属于 task；假设、引用、举例不作为本人事实。"
+            "只在明确时返回事实，否则返回空列表。未知不等于零基础。"
+            "foundation 的 topic 是具体知识点；value_json 是含 level 的 JSON 对象，"
+            "level 只能为 none/basic/intermediate/advanced/unknown。能力依据是用户自述，不是测评。"
+            "例如：我没学过Python => Python/none；我想学Python仅表示 learning_goals，"
+            "不能推断为 Python/none。回答‘没有’只有在前文明确询问本人单一知识点基础时才能提取。"
+            "learning_goals/interests 的 value_json 是字符串数组；major/grade 为 JSON 字符串；"
+            "数组使用原文中的知识点或目标短语，不扩展为用户未提及的领域或目标。"
+            "difficulty_preference 是长期偏好，值为 beginner/progressive/intermediate/advanced。"
+            "混合表达逐项判断，例如‘帮朋友找书，我没学过Python’，只保留明确的本人事实。"
         )
         try:
             result = await self.provider.structured(
                 [
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": text}
+                    *history,
+                    {"role": "user", "content": text},
                 ],
-                ProfileExtraction
+                ProfileExtraction,
             )
-            extracted = []
+            extracted: dict[tuple[str, str], ExtractedMemory] = {}
+            positions: dict[tuple[str, str], int] = {}
             for fact in result.facts:
-                try:
-                    parsed_value = json.loads(fact.value_json)
-                except Exception:
-                    parsed_value = fact.value_json
-                extracted.append(
-                    ExtractedMemory(
-                        category=fact.category,
-                        key=fact.key,
-                        value=parsed_value,
-                        confidence=fact.confidence
-                    )
-                )
-            return extracted
+                value = validate_fact(fact, text, history)
+                if value is not None:
+                    identity = (value.category, value.key)
+                    previous = extracted.get(identity)
+                    position = text.find(fact.evidence)
+                    if previous is not None and isinstance(value.value, list):
+                        value = ExtractedMemory(
+                            value.category,
+                            value.key,
+                            list(dict.fromkeys([*previous.value, *value.value])),
+                            min(previous.confidence, value.confidence),
+                        )
+                    if (
+                        previous is None
+                        or isinstance(value.value, list)
+                        or position >= positions[identity]
+                    ):
+                        extracted[identity] = value
+                        positions[identity] = max(position, positions.get(identity, -1))
+            return list(extracted.values())
         except Exception:
+            logger.warning("Profile fact extraction failed; no facts written", exc_info=True)
             return []

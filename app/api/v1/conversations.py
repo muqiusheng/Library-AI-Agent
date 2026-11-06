@@ -23,7 +23,9 @@ from app.schemas.conversation import (
     MessageRead,
 )
 from app.services.conversation_constraint_service import ConversationConstraintService
+from app.services.conversation_context_service import ConversationContextService
 from app.services.conversation_service import ConversationService
+from app.services.conversation_turn_service import ConversationTurnService
 from app.services.general_chat_service import GeneralChatService
 from app.services.profile_memory_service import ProfileMemoryService
 from app.services.recommendation_service import RecommendationService
@@ -115,12 +117,7 @@ async def stream_message(
     conversation = ConversationRepository(session).get_owned(conversation_id, current_user.id)
     service = ConversationService(session)
     user_message = service.add_user_message(conversation, payload.content)
-    
-    # Run the LLM profile extraction asynchronously
-    await ProfileMemoryService(session).extract_from_message(current_user, user_message)
-    constraints = ConversationConstraintService(session).update_from_message(
-        conversation, payload.content, only_available=payload.only_available
-    )
+
     request_id = request.state.request_id
 
     async def generate() -> AsyncIterator[str]:
@@ -133,13 +130,68 @@ async def stream_message(
             },
         )
         try:
+            contexts = ConversationContextService(session)
+            context = contexts.build(conversation, current_user)
+            turns = ConversationTurnService()
+            resolution = await turns.resolve(context, payload.content)
+            turns.apply(context, resolution, payload.content)
+            contexts.save(conversation, context, commit=False)
+            if resolution.action in {"recommend", "refine"}:
+                context.constraints = ConversationConstraintService(session).update_from_message(
+                    conversation,
+                    payload.content,
+                    only_available=payload.only_available,
+                    commit=False,
+                )
+            contexts.save(conversation, context)
+            yield _event("constraints_updated", context.constraints.model_dump())
+            await ProfileMemoryService(session).extract_from_message(current_user, user_message)
             general_chat = GeneralChatService(session)
-            if not await general_chat.is_library_request(conversation, current_user, payload.content):
+            if resolution.action not in {"recommend", "refine"}:
                 answer_chunks = []
-                async for chunk in general_chat.stream_answer(conversation, current_user, payload.content):
-                    answer_chunks.append(chunk)
-                    yield _event("text_delta", {"content": chunk})
-                
+                answer = None
+                if resolution.action == "clarify":
+                    answer = resolution.clarification or "请补充你想找的图书主题或具体书名。"
+                elif resolution.action in {"availability", "explain"} and resolution.target_rank:
+                    book = context.recommendation.items[resolution.target_rank - 1]
+                    if resolution.action == "availability":
+                        answer = f"《{book.title}》当前有 {book.available_count} 个可借副本。"
+                        locations = [
+                            holding.current_location or holding.collection_location
+                            for holding in book.holdings
+                            if holding.book_status == "available"
+                            and holding.circulation_status == "lendable"
+                        ]
+                        if any(locations):
+                            answer += (
+                                " 馆藏位置："
+                                + "、".join(dict.fromkeys(filter(None, locations)))
+                                + "。"
+                            )
+                    elif not general_chat.provider.available:
+                        answer = f"《{book.title}》：{book.reason}"
+                elif resolution.action == "explain" and not general_chat.provider.available:
+                    answer = (
+                        "\n".join(
+                            f"《{book.title}》：{book.reason}"
+                            for book in context.recommendation.items
+                        )
+                        if context.recommendation
+                        else "当前还没有图书推荐结果。"
+                    )
+                if answer is not None:
+                    answer_chunks.append(answer)
+                    yield _event("text_delta", {"content": answer})
+                else:
+                    async for chunk in general_chat.stream_answer(
+                        conversation,
+                        current_user,
+                        payload.content,
+                        context=context,
+                    ):
+                        answer_chunks.append(chunk)
+                        yield _event("text_delta", {"content": chunk})
+
                 answer = "".join(answer_chunks)
                 assistant_message = service.add_assistant_message(conversation, answer)
                 yield _event(
@@ -148,20 +200,39 @@ async def stream_message(
                 )
                 return
             yield _event("message_start", {"request_id": request_id, "status": "retrieving"})
+            excluded_ids = list(context.task.excluded_book_ids)
+            slots = None
+            if resolution.action == "refine" and context.recommendation:
+                previous_ids = [item.book_id for item in context.recommendation.items]
+                if resolution.target_rank is not None:
+                    rejected_id = previous_ids[resolution.target_rank - 1]
+                    excluded_ids.append(rejected_id)
+                    context.task.excluded_book_ids = list(dict.fromkeys(excluded_ids))
+                    slots = [
+                        None if i == resolution.target_rank - 1 else book_id
+                        for i, book_id in enumerate(previous_ids)
+                    ]
+                elif any(word in payload.content for word in ("换一批", "换一些", "还有别的")):
+                    excluded_ids.extend(previous_ids)
+            contexts.save(conversation, context)
             recommendation = await RecommendationService(session).recommend(
                 user=current_user,
                 conversation_id=conversation.id,
-                query=payload.content,
-                only_available=constraints.only_available,
-                constraints=constraints.model_dump(),
+                query=turns.query(context),
+                only_available=context.constraints.only_available,
+                constraints=context.constraints.model_dump(),
+                excluded_book_ids=excluded_ids,
+                replacement_slots=slots,
             )
             yield _event("message_start", {"request_id": request_id, "status": "organizing"})
-            
+
             summary_chunks = []
-            async for chunk in RecommendationService(session).stream_summary(recommendation, current_user):
+            async for chunk in RecommendationService(session).stream_summary(
+                recommendation, current_user
+            ):
                 summary_chunks.append(chunk)
                 yield _event("text_delta", {"content": chunk})
-                
+
             summary = "".join(summary_chunks)
             assistant_message = service.add_recommendation_message(
                 conversation, summary, recommendation.id
@@ -181,6 +252,7 @@ async def stream_message(
             )
         except Exception:
             import traceback
+
             traceback.print_exc()
             yield _event(
                 "error",

@@ -1,4 +1,6 @@
 from collections.abc import Iterator
+from types import SimpleNamespace
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
@@ -9,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.db.models import Conversation, MemorySource, Message, MessageRole, MessageType, User
 from app.db.session import engine, get_db
 from app.main import app
+from app.services.profile_fact_extractor import ProfileExtraction, ProfileFact
 from app.services.profile_memory_service import ProfileMemoryService
 
 
@@ -81,16 +84,41 @@ def _message(session: Session, user: User, content: str) -> Message:
     return message
 
 
-def test_conversation_memory_manual_priority_history_and_temporary_filter(
+@pytest.mark.asyncio
+async def test_conversation_memory_manual_priority_history_and_temporary_filter(
     profile_client: tuple[TestClient, Session],
 ) -> None:
     client, session = profile_client
     student_no, headers = _create_user(client)
     user = session.scalar(select(User).where(User.student_no == student_no))
     assert user is not None
-    service = ProfileMemoryService(session)
 
-    created = service.extract_from_message(user, _message(session, user, "我没学过 Java"))
+    async def structured(messages, schema):
+        text = messages[-1]["content"]
+        topic = "Python" if "Python" in text else "Java"
+        return ProfileExtraction(
+            facts=[
+                ProfileFact(
+                    category="foundation",
+                    topic=topic,
+                    value_json='{"level":"none"}',
+                    subject="user",
+                    scope="persistent",
+                    evidence=text,
+                    confidence=0.95,
+                )
+            ]
+        )
+
+    service = ProfileMemoryService(
+        session,
+        SimpleNamespace(
+            available=True,
+            structured=AsyncMock(side_effect=structured),
+        ),
+    )
+
+    created = await service.extract_from_message(user, _message(session, user, "我没学过 Java"))
     assert len(created) == 1
     assert created[0].value_json["level"] == "none"
 
@@ -108,8 +136,8 @@ def test_conversation_memory_manual_priority_history_and_temporary_filter(
     assert edited.json()["data"]["source"] == MemorySource.MANUAL.value
     assert edited.json()["data"]["is_user_edited"] is True
 
-    assert not service.extract_from_message(user, _message(session, user, "Java 零基础"))
-    assert not service.extract_from_message(
+    assert not await service.extract_from_message(user, _message(session, user, "Java 零基础"))
+    assert not await service.extract_from_message(
         user, _message(session, user, "这次我没学过 Python，只看可借图书")
     )
 

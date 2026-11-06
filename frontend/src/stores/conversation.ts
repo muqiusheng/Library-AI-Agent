@@ -19,6 +19,7 @@ export const useConversationStore = defineStore('conversation', () => {
   const loading = ref(false)
   const errorMessage = ref('')
   const onlyAvailable = ref(false)
+  const savedOnlyAvailable = ref(false)
   const controller = ref<AbortController | null>(null)
   const activeConversation = computed(() => conversations.value.find((item) => item.id === activeId.value) ?? null)
   const isStreaming = computed(() => !['idle', 'complete', 'error'].includes(streamStatus.value))
@@ -42,11 +43,15 @@ export const useConversationStore = defineStore('conversation', () => {
     conversations.value.unshift(created)
     activeId.value = created.id
     messages.value = []
+    onlyAvailable.value = false
+    savedOnlyAvailable.value = false
   }
 
   async function selectConversation(id: string): Promise<void> {
     activeId.value = id
-    const values = await api.listMessages(id)
+    const [values, constraints] = await Promise.all([api.listMessages(id), api.getConstraints(id)])
+    onlyAvailable.value = constraints.only_available
+    savedOnlyAvailable.value = constraints.only_available
     messages.value = values.map((value) => ({ ...value }))
     await Promise.all(
       messages.value.map(async (message) => {
@@ -69,7 +74,11 @@ export const useConversationStore = defineStore('conversation', () => {
   async function send(content: string): Promise<void> {
     const cleanContent = content.trim()
     if (!cleanContent || isStreaming.value) return
-    if (!activeId.value) await newConversation()
+    if (!activeId.value) {
+      const requestedOnlyAvailable = onlyAvailable.value
+      await newConversation()
+      onlyAvailable.value = requestedOnlyAvailable
+    }
     const conversationId = activeId.value as string
     const timestamp = new Date().toISOString()
     messages.value.push({
@@ -87,7 +96,11 @@ export const useConversationStore = defineStore('conversation', () => {
     try {
       await api.streamMessage(
         conversationId,
-        { content: cleanContent, only_available: onlyAvailable.value },
+        {
+          content: cleanContent,
+          ...(onlyAvailable.value !== savedOnlyAvailable.value
+            ? { only_available: onlyAvailable.value } : {})
+        },
         (event) => handleEvent(event, assistant),
         controller.value.signal
       )
@@ -105,12 +118,16 @@ export const useConversationStore = defineStore('conversation', () => {
   }
 
   function handleEvent(event: StreamEvent, assistant: WorkspaceMessage): void {
-    if (event.event === 'message_start' && typeof event.data.status === 'string') {
+    if (event.event === 'constraints_updated') {
+      onlyAvailable.value = Boolean(event.data.only_available)
+      savedOnlyAvailable.value = onlyAvailable.value
+    } else if (event.event === 'message_start' && typeof event.data.status === 'string') {
       streamStatus.value = event.data.status as StreamStatus
     } else if (event.event === 'text_delta') {
       assistant.content += String(event.data.content ?? '')
     } else if (event.event === 'recommendation_ready') {
       assistant.recommendation = event.data as unknown as RecommendationSetData
+      assistant.structured_payload = { recommendation_set_id: assistant.recommendation.id }
     } else if (event.event === 'error') {
       throw new Error(String(event.data.message ?? '推荐失败'))
     }
@@ -135,6 +152,8 @@ export const useConversationStore = defineStore('conversation', () => {
     messages.value = []
     streamStatus.value = 'idle'
     errorMessage.value = ''
+    onlyAvailable.value = false
+    savedOnlyAvailable.value = false
   }
 
   return {

@@ -29,3 +29,9 @@ export interface StreamEvent {
   event: string
   data: Record<string, unknown>
 }
+
+export interface ConversationConstraints {
+  only_available: boolean
+  difficulty: string | null
+  excluded_terms: string[]
+}

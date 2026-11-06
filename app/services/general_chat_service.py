@@ -1,20 +1,47 @@
 import json
+from typing import TYPE_CHECKING
+
 from sqlalchemy.orm import Session
 
 from app.db.models import Conversation, MessageRole, User
 from app.integrations.llm.deepseek import DeepSeekError, DeepSeekProvider
 from app.repositories.conversation_repository import ConversationRepository
 
+if TYPE_CHECKING:
+    from app.services.conversation_context_service import ConversationContext
+
 from pydantic import BaseModel, Field
 
 _LIBRARY_TERMS = (
-    "书", "图书", "借阅", "借书", "还书", "馆藏", "可借", "索书号",
-    "推荐", "阅读", "教材", "课程", "学习", "入门", "进阶", "作者",
-    "出版社", "预约", "路线"
+    "书",
+    "图书",
+    "借阅",
+    "借书",
+    "还书",
+    "馆藏",
+    "可借",
+    "索书号",
+    "推荐",
+    "阅读",
+    "教材",
+    "课程",
+    "学习",
+    "入门",
+    "进阶",
+    "作者",
+    "出版社",
+    "预约",
+    "路线",
 )
 
+
 class IntentClassification(BaseModel):
-    is_library_search: bool = Field(description="True if the user explicitly wants to search or get book recommendations. False if the user is chatting, asking a follow-up question, or if their intent is highly ambiguous (e.g. just a keyword like 'Java').")
+    is_library_search: bool = Field(
+        description=(
+            "True for an explicit book search or recommendation request. "
+            "False for chat, explanation, or ambiguous input such as 'Java'."
+        )
+    )
     reason: str = Field(description="The reasoning behind the classification.")
 
 
@@ -29,30 +56,27 @@ class GeneralChatService:
         if not self.provider.available:
             return fallback_result
 
-        history = ConversationRepository(self.session).messages(
-            conversation.id, conversation.user_id
-        )[-6:]
-        
-        from app.services.recommendation_service import RecommendationService
-        profile_json = json.dumps(RecommendationService._profile_snapshot(user), ensure_ascii=False) if user.profile else "{}"
-        
-        system_prompt = (
-            "Analyze the user's latest message and determine if it is a primary request to search/recommend books from the library. "
-            "If the user is asking a follow-up question (e.g., 'Why did you recommend these books?'), asking for clarification, just chatting, "
-            "or if the intent is highly ambiguous (e.g. just a single noun like 'Python' or 'Agent' without indicating they want books), set is_library_search to false. "
-            "IMPORTANT: If the user explicitly asks for books, learning resources, or recommendations (e.g. '我想学langchain', '推荐关于xxx的书'), "
-            "you MUST set is_library_search to true, regardless of whether it matches their profile or not."
+        history = ConversationRepository(self.session).recent_messages(
+            conversation.id, conversation.user_id, limit=6
         )
-        
+
+        system_prompt = (
+            "Determine whether the user explicitly requests book search or recommendations. "
+            "Set is_library_search=false for explanations, clarification, chat, "
+            "or an ambiguous noun such as Python or Agent without a request for books. "
+            "For explicit requests for books or learning resources, including 我想学langchain, "
+            "set is_library_search=true regardless of their profile."
+        )
+
         messages = [{"role": "system", "content": system_prompt}]
         for msg in history:
             if msg.role in {MessageRole.USER, MessageRole.ASSISTANT}:
                 messages.append({"role": msg.role.value, "content": msg.content})
-        
+
         # In case the text is not yet saved in history or to emphasize the current query
         if not history or history[-1].content != text:
             messages.append({"role": "user", "content": text})
-            
+
         try:
             classification = await self.provider.structured(messages, IntentClassification)
             return classification.is_library_search
@@ -62,9 +86,9 @@ class GeneralChatService:
     async def answer(self, conversation: Conversation, question: str) -> str:
         if not self.provider.available:
             return self._fallback(question)
-        history = ConversationRepository(self.session).messages(
+        history = ConversationRepository(self.session).recent_messages(
             conversation.id, conversation.user_id
-        )[-12:]
+        )
         messages = [
             {
                 "role": "system",
@@ -90,17 +114,32 @@ class GeneralChatService:
 
     from collections.abc import AsyncIterator
 
-    async def stream_answer(self, conversation: Conversation, user: User, question: str) -> AsyncIterator[str]:
+    async def stream_answer(
+        self,
+        conversation: Conversation,
+        user: User,
+        question: str,
+        context: "ConversationContext | None" = None,
+    ) -> AsyncIterator[str]:
         if not self.provider.available:
             yield self._fallback(question)
             return
-        history = ConversationRepository(self.session).messages(
-            conversation.id, conversation.user_id
-        )[-12:]
-        
+        history = (
+            ConversationRepository(self.session).recent_messages(
+                conversation.id, conversation.user_id
+            )
+            if context is None
+            else []
+        )
+
         from app.services.recommendation_service import RecommendationService
-        profile_json = json.dumps(RecommendationService._profile_snapshot(user), ensure_ascii=False) if user.profile else "{}"
-        
+
+        profile_json = (
+            json.dumps(RecommendationService._profile_snapshot(user), ensure_ascii=False)
+            if user.profile
+            else "{}"
+        )
+
         messages = [
             {
                 "role": "system",
@@ -111,7 +150,7 @@ class GeneralChatService:
                     "不要在用户没有明确询问图书时强行推荐或检索图书。"
                     f"用户的当前画像信息：{profile_json}。"
                     "【重要指令】如果用户的输入意图非常模糊（例如仅仅输入了“机器学习”或者“Agent”等名词，或者可能存在多领域歧义且没有明确要书），"
-                    "请你**主动向用户提供选项**。例如：“为了给您推荐最合适的 Agent 图书，请问您指的是人工智能方向的 AI Agent，还是网络代理？”并引导用户做出选择。"
+                    "请主动提供选项，询问用户指的是人工智能方向的 AI Agent，还是网络代理。"
                     "请使用 Markdown 格式来排版你的回答，使之结构清晰美观。"
                 ),
             },
@@ -121,6 +160,20 @@ class GeneralChatService:
                 if message.role in {MessageRole.USER, MessageRole.ASSISTANT}
             ],
         ]
+        if context is not None:
+            messages = [
+                messages[0],
+                {
+                    "role": "system",
+                    "content": (
+                        "以下为当前任务和真实馆藏结果。序号按 books 顺序从1开始。"
+                        "只能据此解释图书，不能编造库存、书名或执行借阅。\n" + context.prompt()
+                    ),
+                },
+                *context.history,
+            ]
+            if not context.history or context.history[-1] != {"role": "user", "content": question}:
+                messages.append({"role": "user", "content": question})
         try:
             async for chunk in self.provider.stream_chat(messages, temperature=0.5):
                 yield chunk
