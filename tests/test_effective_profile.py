@@ -1,3 +1,4 @@
+import json
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -311,10 +312,17 @@ async def test_online_rewrite_rerank_and_summary_share_effective_snapshot(memory
 
         async def structured(self, messages, schema):
             captured.append(messages)
-            return (
-                schema(keywords="Python")
-                if schema.__name__ == "EnrichedQuery"
-                else schema(items=[])
+            if schema.__name__ == "EnrichedQuery":
+                return schema(keywords="Python")
+            candidates = json.loads(messages[-1]["content"].split("候选：", 1)[1])
+            return schema(
+                items=[
+                    {
+                        "book_id": candidates[0]["book_id"],
+                        "rank": 1,
+                        "reason": "简介包含 Python 入门练习和项目。",
+                    }
+                ]
             )
 
         async def stream_chat(self, messages, **kwargs):
