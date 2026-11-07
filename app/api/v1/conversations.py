@@ -26,6 +26,7 @@ from app.services.conversation_constraint_service import ConversationConstraintS
 from app.services.conversation_context_service import ConversationContextService
 from app.services.conversation_service import ConversationService
 from app.services.conversation_turn_service import ConversationTurnService
+from app.services.effective_profile_service import EffectiveProfileService
 from app.services.general_chat_service import GeneralChatService
 from app.services.profile_memory_service import ProfileMemoryService
 from app.services.recommendation_service import RecommendationService
@@ -132,20 +133,80 @@ async def stream_message(
         try:
             contexts = ConversationContextService(session)
             context = contexts.build(conversation, current_user)
+            profiles = ProfileMemoryService(session)
+            text = payload.content
+            confirmation = text.strip(" 。！!\n")
+            pending = context.task.pending_profile_updates
+            previous = context.history[-2] if len(context.history) >= 2 else {}
+            is_confirmation = pending and "是否更新画像" in previous.get("content", "")
+            if is_confirmation and confirmation in {
+                "是",
+                "确认",
+                "确认更新",
+                "同意",
+                "更新吧",
+                "否",
+                "不更新",
+                "保留原画像",
+            }:
+                pending_request = context.task.pending_profile_request
+                accepted = confirmation not in {"否", "不更新", "保留原画像"}
+                updated = profiles.confirm_conflicts(current_user, pending) if accepted else False
+                answer = (
+                    "已更新画像。"
+                    if updated
+                    else (
+                        "画像已发生变化，请重新说明要更新的能力。" if accepted else "已保留原画像。"
+                    )
+                )
+                context.task.pending_profile_updates = []
+                context.task.pending_profile_request = ""
+                contexts.save(conversation, context)
+                yield _event("text_delta", {"content": answer})
+                if updated and any(
+                    word in pending_request for word in ("推荐", "找书", "图书", "教材")
+                ):
+                    text = pending_request
+                else:
+                    assistant = service.add_assistant_message(conversation, answer)
+                    yield _event(
+                        "message_end", {"message_id": str(assistant.id), "request_id": request_id}
+                    )
+                    return
+            await profiles.extract_from_message(current_user, user_message)
+            context.profile = EffectiveProfileService(session).build(current_user)
+            if profiles.conflicts:
+                context.task.pending_profile_updates = profiles.conflicts
+                context.task.pending_profile_request = text
+                contexts.save(conversation, context)
+                changes = "；".join(
+                    f"{profiles.describe(item['previous_value'])} → "
+                    f"{profiles.describe(item['value_json'])}"
+                    for item in profiles.conflicts
+                )
+                answer = (
+                    f"本次陈述与手工确认的画像冲突：{changes}。"
+                    "是否更新画像？请回复“确认更新”或“保留原画像”。"
+                )
+                yield _event("text_delta", {"content": answer})
+                assistant = service.add_assistant_message(conversation, answer)
+                yield _event(
+                    "message_end", {"message_id": str(assistant.id), "request_id": request_id}
+                )
+                return
             turns = ConversationTurnService()
-            resolution = await turns.resolve(context, payload.content)
-            turns.apply(context, resolution, payload.content)
+            resolution = await turns.resolve(context, text)
+            turns.apply(context, resolution, text)
             contexts.save(conversation, context, commit=False)
             if resolution.action in {"recommend", "refine"}:
                 context.constraints = ConversationConstraintService(session).update_from_message(
                     conversation,
-                    payload.content,
+                    text,
                     only_available=payload.only_available,
                     commit=False,
                 )
             contexts.save(conversation, context)
             yield _event("constraints_updated", context.constraints.model_dump())
-            await ProfileMemoryService(session).extract_from_message(current_user, user_message)
             general_chat = GeneralChatService(session)
             if resolution.action not in {"recommend", "refine"}:
                 answer_chunks = []
@@ -186,7 +247,7 @@ async def stream_message(
                     async for chunk in general_chat.stream_answer(
                         conversation,
                         current_user,
-                        payload.content,
+                        text,
                         context=context,
                     ):
                         answer_chunks.append(chunk)
@@ -212,7 +273,7 @@ async def stream_message(
                         None if i == resolution.target_rank - 1 else book_id
                         for i, book_id in enumerate(previous_ids)
                     ]
-                elif any(word in payload.content for word in ("换一批", "换一些", "还有别的")):
+                elif any(word in text for word in ("换一批", "换一些", "还有别的")):
                     excluded_ids.extend(previous_ids)
             contexts.save(conversation, context)
             recommendation = await RecommendationService(session).recommend(

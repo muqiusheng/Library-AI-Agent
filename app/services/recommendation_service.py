@@ -25,6 +25,7 @@ from app.schemas.recommendation import (
     RecommendationSetRead,
     ScoreBreakdown,
 )
+from app.services.effective_profile_service import EffectiveProfileService
 from app.services.system_config_service import SystemConfigService
 
 
@@ -66,8 +67,15 @@ class RecommendationService:
             yield recommendation_set.summary
             return
 
-        profile_json = (
-            json.dumps(self._profile_snapshot(user), ensure_ascii=False) if user.profile else "{}"
+        stored = self.session.get(RecommendationSet, recommendation_set.id)
+        snapshot = (
+            stored.profile_snapshot
+            if stored and stored.user_id == user.id
+            else self._profile_snapshot(user)
+        )
+        profile_json = json.dumps(snapshot, ensure_ascii=False)
+        conditions_json = json.dumps(
+            stored.constraints_snapshot if stored else {}, ensure_ascii=False
         )
         books_info = ", ".join([f"《{item.title}》" for item in recommendation_set.items])
 
@@ -82,6 +90,7 @@ class RecommendationService:
         )
         user_prompt = (
             f"用户的请求：{recommendation_set.query}\n用户画像：{profile_json}\n"
+            f"实际条件：{conditions_json}\n"
             f"推荐了：{books_info}，总计 {len(recommendation_set.items)} 本。"
         )
 
@@ -108,7 +117,7 @@ class RecommendationService:
         excluded_book_ids: list[UUID] | None = None,
         replacement_slots: list[UUID | None] | None = None,
     ) -> RecommendationSetRead:
-        enriched_query = await self._enrich_query(query, user)
+        profile = self._profile_snapshot(user)
         constraint_values = {"only_available": only_available, **(constraints or {})}
         config = SystemConfigService(self.session)
         top_k = int(config.get("recommendation_top_k"))
@@ -134,6 +143,20 @@ class RecommendationService:
         excluded_terms = [
             str(value).casefold() for value in constraint_values.get("excluded_terms", [])
         ]
+        preferred = self._effective_preference(
+            user,
+            feedback,
+            constraint_values.get("difficulty"),
+            profile=profile,
+            query=query,
+        )
+        constraint_values["effective_difficulty"] = preferred
+        enriched_query = await self._enrich_query(
+            query,
+            user,
+            profile=profile,
+            preferred_difficulty=preferred,
+        )
         candidates = self.library.search_candidates(enriched_query, limit=50)
         candidates = [
             book
@@ -147,19 +170,21 @@ class RecommendationService:
         ]
         if only_available:
             candidates = [book for book in candidates if self._available_count(book) > 0]
-        preferred = self._effective_preference(user, feedback, constraint_values.get("difficulty"))
         scored = sorted(
-            (self._score(book, query, user, preferred, weights) for book in candidates),
+            (
+                self._score(book, query, user, preferred, weights, profile=profile)
+                for book in candidates
+            ),
             key=lambda item: item.total,
             reverse=True,
         )
         top = scored[:10]
-        ordered = await self._rerank(query, top)
+        ordered = await self._rerank(query, top, profile=profile)
         final = ordered[:top_k]
         if replacement_slots:
             retained_ids = [book_id for book_id in replacement_slots if book_id is not None]
             retained = {
-                book.id: self._score(book, query, user, preferred, weights)
+                book.id: self._score(book, query, user, preferred, weights, profile=profile)
                 for book in self.library.get_books(retained_ids)
                 if book.id not in excluded_ids
                 and book.id not in completed_ids
@@ -179,7 +204,7 @@ class RecommendationService:
             user_id=user.id,
             conversation_id=conversation_id,
             query=query,
-            profile_snapshot=self._profile_snapshot(user),
+            profile_snapshot=profile,
             constraints_snapshot=constraint_values,
             model_name=self.llm.settings.deepseek_chat_model
             if self.llm.available
@@ -207,17 +232,45 @@ class RecommendationService:
             )
             cards.append(self._card(item))
         self.session.commit()
+        summary = f"根据你的目标，从当前馆藏中筛选出 {len(cards)} 本匹配图书。"
+        related = EffectiveProfileService.relevant_abilities(profile, query)
+        if related and cards:
+            summary += (
+                " 已结合你自述的"
+                + "、".join(item["topic"] + "基础" for item in related)
+                + "匹配难度。"
+            )
         return RecommendationSetRead(
             id=recommendation_set.id,
             query=query,
-            summary=f"根据你的目标，从当前馆藏中筛选出 {len(cards)} 本匹配图书。",
+            summary=summary,
             created_at=recommendation_set.created_at,
             items=cards,
         )
 
-    async def _enrich_query(self, query: str, user: User) -> str:
-        if not self.llm.available or not user.profile:
-            return query
+    async def _enrich_query(
+        self,
+        query: str,
+        user: User,
+        *,
+        profile: dict | None = None,
+        preferred_difficulty: str | None = None,
+    ) -> str:
+        profile = profile if profile is not None else self._profile_snapshot(user)
+        levels = [
+            item["level"] for item in EffectiveProfileService.relevant_abilities(profile, query)
+        ]
+        if not self.llm.available:
+            explicit_advanced = any(
+                word in query.casefold() for word in ("advanced", "进阶", "高级", "挑战")
+            )
+            return (
+                query + " 入门 基础"
+                if not explicit_advanced
+                and preferred_difficulty != "advanced"
+                and any(level in {"none", "basic"} for level in levels)
+                else query
+            )
 
         system_prompt = (
             "You are a library search query optimizer. The user wants book recommendations. "
@@ -227,9 +280,14 @@ class RecommendationService:
             "Resolve ambiguity. If the user asks for 'agent' and their profile indicates "
             "they know machine learning, output '人工智能 智能体 AI Agent'. "
             "Only output the exact search keywords, nothing else."
+            " Keep the requested topic. Use relevant self-reported abilities to choose difficulty; "
+            "do not infer zero foundation for unknown subjects. Explicit current difficulty wins."
         )
-        profile_json = json.dumps(self._profile_snapshot(user), ensure_ascii=False)
-        user_prompt = f"Profile: {profile_json}\nRaw Query: {query}"
+        profile_json = json.dumps(profile, ensure_ascii=False)
+        user_prompt = (
+            f"Profile: {profile_json}\nRaw Query: {query}\n"
+            f"Effective difficulty: {preferred_difficulty}"
+        )
 
         try:
 
@@ -287,24 +345,35 @@ class RecommendationService:
         user: User,
         preferred_difficulty: str | None = None,
         weights: dict[str, float] | None = None,
+        *,
+        profile: dict | None = None,
     ) -> ScoredBook:
+        profile = profile if profile is not None else self._profile_snapshot(user)
         tags = {tag.tag_type: tag.tag_value for tag in book.tags}
         topics = [tag.tag_value for tag in book.tags if tag.tag_type == "topic"]
         haystack = " ".join([book.title, book.description or "", *topics]).casefold()
         terms = self._terms(query)
         matched = sum(1 for term in terms if term in haystack)
         goal = min(100.0, 45.0 + 55.0 * matched / max(1, len(terms))) if matched else 20.0
-        preferred = preferred_difficulty or (
-            user.profile.difficulty_preference.value if user.profile else "progressive"
+        goals = " ".join(profile.get("learning_goals", []))
+        goal_terms = self._terms(goals)
+        goal_terms.extend(
+            word
+            for word in ("项目", "实践", "练习", "考研", "考试", "原理", "理论")
+            if word in goals
         )
+        if matched and goal_terms:
+            aligned = any(term in haystack for term in goal_terms)
+            goal = 0.85 * goal + 0.15 * (100.0 if aligned else 50.0)
+        preferred = preferred_difficulty or (profile.get("difficulty_preference", "progressive"))
         difficulty_value = tags.get("difficulty", "intermediate")
         difficulty = self._difficulty_score(preferred, difficulty_value)
         major = (
             80.0
-            if user.profile and any(part in haystack for part in self._terms(user.profile.major))
+            if any(part in haystack for part in self._terms(profile.get("major", "")))
             else 55.0
         )
-        interests = user.profile.interests if user.profile else []
+        interests = profile.get("interests", [])
         interest = 85.0 if any(value.casefold() in haystack for value in interests) else 50.0
         semantic = min(100.0, goal * 0.85 + (15.0 if topics else 0.0))
         availability = 100.0 if self._available_count(book) else 35.0 if book.holdings else 0.0
@@ -326,6 +395,21 @@ class RecommendationService:
             2,
         )
         reason = self._template_reason(book, difficulty_value, topics, availability)
+        related = EffectiveProfileService.relevant_abilities(profile, query)
+        if related:
+            labels = {
+                "none": "未学习",
+                "basic": "有基础",
+                "intermediate": "中等水平",
+                "advanced": "进阶水平",
+                "unknown": "尚不确定",
+                "beginner": "入门",
+                "progressive": "循序渐进",
+            }
+            basis = "、".join(f"{item['topic']}{labels[item['level']]}" for item in related)
+            reason += (
+                f" 结合你自述的基础（{basis}），按{labels.get(preferred, preferred)}难度匹配。"
+            )
         return ScoredBook(
             book=book,
             scores=ScoreBreakdown(
@@ -340,17 +424,39 @@ class RecommendationService:
             reason=reason,
         )
 
-    async def _rerank(self, query: str, candidates: list[ScoredBook]) -> list[ScoredBook]:
+    async def _rerank(
+        self, query: str, candidates: list[ScoredBook], *, profile: dict | None = None
+    ) -> list[ScoredBook]:
         if not self.llm.available or not candidates:
             return candidates
         allowed = {item.book.id: item for item in candidates}
         payload = [
-            {"book_id": str(item.book.id), "title": item.book.title, "score": item.total}
+            {
+                "book_id": str(item.book.id),
+                "title": item.book.title,
+                "score": item.total,
+                "fit": item.reason,
+            }
             for item in candidates
         ]
         try:
             result = await self.llm.structured(
-                [{"role": "user", "content": f"学习需求：{query}\n候选：{payload}"}],
+                [
+                    {
+                        "role": "system",
+                        "content": (
+                            "结合有效画像与匹配分排序；优先当前明确要求，未知基础不能视为零基础。"
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": (
+                            f"学习需求：{query}\n"
+                            f"有效画像：{json.dumps(profile or {}, ensure_ascii=False)}\n"
+                            f"候选：{payload}"
+                        ),
+                    },
+                ],
                 RerankOutput,
             )
         except DeepSeekError:
@@ -433,7 +539,14 @@ class RecommendationService:
         return max(20.0, 100.0 - abs(levels.get(preferred, 1) - levels.get(actual, 1)) * 40.0)
 
     @staticmethod
-    def _effective_preference(user: User, feedback: list[RecommendationFeedback], override) -> str:
+    def _effective_preference(
+        user: User,
+        feedback: list[RecommendationFeedback],
+        override,
+        *,
+        profile: dict | None = None,
+        query: str = "",
+    ) -> str:
         if override in {"beginner", "intermediate", "advanced"}:
             return str(override)
         too_hard = sum(value.type == FeedbackType.TOO_HARD for value in feedback)
@@ -442,6 +555,19 @@ class RecommendationService:
             return "beginner"
         if too_easy > too_hard:
             return "advanced"
+        if profile is not None:
+            if "difficulty_preference" in profile.get("sources", {}):
+                return profile["difficulty_preference"]
+            levels = [
+                item["level"]
+                for item in EffectiveProfileService.relevant_abilities(profile, query)
+                if item["level"] != "unknown"
+            ]
+            if levels:
+                rank = {"none": 0, "basic": 0, "intermediate": 1, "advanced": 2}
+                weakest = min(levels, key=lambda level: rank[level])
+                return {0: "beginner", 1: "intermediate", 2: "advanced"}[rank[weakest]]
+            return profile.get("difficulty_preference", "progressive")
         return user.profile.difficulty_preference.value if user.profile else "progressive"
 
     @staticmethod
@@ -452,15 +578,5 @@ class RecommendationService:
         availability_text = "目前有可借副本" if availability >= 100 else "馆藏信息完整，可到馆查阅"
         return f"内容聚焦{topic_text}，难度为 {difficulty}；{availability_text}。"
 
-    @staticmethod
-    def _profile_snapshot(user: User) -> dict:
-        if not user.profile:
-            return {}
-        return {
-            "grade": user.profile.grade,
-            "major": user.profile.major,
-            "foundation": user.profile.foundation,
-            "learning_goals": user.profile.learning_goals,
-            "interests": user.profile.interests,
-            "difficulty_preference": user.profile.difficulty_preference.value,
-        }
+    def _profile_snapshot(self, user: User) -> dict:
+        return EffectiveProfileService(self.session).build(user)

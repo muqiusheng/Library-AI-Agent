@@ -107,6 +107,21 @@ class GeneralChatService:
                 if message.role in {MessageRole.USER, MessageRole.ASSISTANT}
             ],
         ]
+        from app.services.effective_profile_service import EffectiveProfileService
+
+        user = self.session.get(User, conversation.user_id)
+        if user is not None:
+            messages.insert(
+                1,
+                {
+                    "role": "system",
+                    "content": "有效画像："
+                    + json.dumps(
+                        EffectiveProfileService(self.session).build(user),
+                        ensure_ascii=False,
+                    ),
+                },
+            )
         try:
             return await self.provider.chat(messages, temperature=0.5)
         except DeepSeekError:
@@ -132,12 +147,11 @@ class GeneralChatService:
             else []
         )
 
-        from app.services.recommendation_service import RecommendationService
+        from app.services.effective_profile_service import EffectiveProfileService
 
-        profile_json = (
-            json.dumps(RecommendationService._profile_snapshot(user), ensure_ascii=False)
-            if user.profile
-            else "{}"
+        profile_json = json.dumps(
+            context.profile if context else EffectiveProfileService(self.session).build(user),
+            ensure_ascii=False,
         )
 
         messages = [

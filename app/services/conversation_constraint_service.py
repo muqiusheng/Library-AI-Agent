@@ -51,7 +51,10 @@ class ConversationConstraintService:
             changes["only_available"] = True
         if any(value in text for value in ("简单一点", "简单点", "太难", "入门一些")):
             changes["difficulty"] = "beginner"
-        elif any(value in text for value in ("难一点", "进阶一些", "更有挑战")):
+        elif any(
+            value in text
+            for value in ("难一点", "进阶一些", "更有挑战", "进阶书", "高级教材", "高级图书")
+        ):
             changes["difficulty"] = "advanced"
         if "取消难度" in text or "不限难度" in text:
             changes["difficulty"] = None

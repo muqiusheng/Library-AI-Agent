@@ -8,6 +8,7 @@ from app.db.models import Conversation, ConversationConstraint, MessageRole, Rec
 from app.repositories.conversation_repository import ConversationRepository
 from app.schemas.conversation import ConstraintRead, ConversationTask
 from app.schemas.recommendation import RecommendationSetRead
+from app.services.effective_profile_service import EffectiveProfileService
 from app.services.recommendation_service import RecommendationService
 
 
@@ -67,7 +68,7 @@ class ConversationContextService:
             task,
             ConstraintRead.model_validate(values),
             history,
-            RecommendationService._profile_snapshot(user),
+            EffectiveProfileService(self.session).build(user),
             recommendation,
         )
 

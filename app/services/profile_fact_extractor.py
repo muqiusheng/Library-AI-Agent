@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 
 class ProfileFact(BaseModel):
+    operation: Literal["set", "add", "remove"] = "add"
     category: Literal[
         "foundation", "learning_goals", "interests", "difficulty_preference", "major", "grade"
     ]
@@ -35,6 +36,7 @@ class ExtractedMemory:
     key: str
     value: dict[str, Any] | list[Any] | str | int | float | bool
     confidence: float
+    operation: str = "set"
 
 
 # Keep identity distinctions: JavaScript is not Java, and AI Agent is not a network proxy.
@@ -79,6 +81,26 @@ def normalize_topic(topic: str) -> tuple[str, str]:
             return key, label
     # Unknown topics remain distinct and do not get collapsed to a broad field.
     return token, unicodedata.normalize("NFKC", topic).strip()
+
+
+def explicit_foundation(text: str) -> list[dict]:
+    """Read only explicitly named levels from a manually edited foundation field."""
+    facts = []
+    for clause in re.split(r"[，,。；;]|但是|但", text):
+        level = None
+        if re.search(r"没学过|没接触过|零基础|不会|不懂|没有.*基础", clause):
+            level = "none"
+        elif re.search(r"熟练|精通|进阶|高级|独立完成", clause):
+            level = "advanced"
+        elif re.search(r"熟悉|中级|中等", clause):
+            level = "intermediate"
+        elif re.search(r"学过|基础|入门|了解|会用|会写", clause):
+            level = "basic"
+        if level:
+            for _, (label, _) in _ALIASES.items():
+                if _has_topic(label, clause):
+                    facts.append({"topic": label, "level": level, "basis": "self_report"})
+    return facts
 
 
 def _clause(text: str, evidence: str) -> str:
@@ -242,4 +264,11 @@ def validate_fact(
         )
         if not (direct or reply) or value not in clause:
             return None
-    return ExtractedMemory(fact.category, fact.category, value, fact.confidence)
+    operation = "set"
+    if fact.category in {"learning_goals", "interests"}:
+        operation = fact.operation
+        if re.search(r"不再|不喜欢|不感兴趣|放弃|取消.*目标", clause):
+            operation = "remove"
+        elif re.search(r"改为|改成|只喜欢|只对", clause):
+            operation = "set"
+    return ExtractedMemory(fact.category, fact.category, value, fact.confidence, operation)

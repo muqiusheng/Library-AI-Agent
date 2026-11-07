@@ -146,8 +146,7 @@ async def test_conversation_memory_manual_priority_history_and_temporary_filter(
     assert len(java_memories) == 2
     assert sum(item["is_active"] for item in java_memories) == 1
     assert (
-        next(item for item in java_memories if item["is_active"])["value_json"]["level"]
-        == "beginner"
+        next(item for item in java_memories if item["is_active"])["value_json"]["level"] == "basic"
     )
 
     _, other_headers = _create_user(client)

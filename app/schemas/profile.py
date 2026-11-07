@@ -43,3 +43,4 @@ class MemoryUpdate(BaseModel):
 class ProfileDetail(BaseModel):
     profile: ProfileSummary | None
     memories: list[MemoryRead]
+    effective_profile: dict[str, Any] = Field(default_factory=dict)

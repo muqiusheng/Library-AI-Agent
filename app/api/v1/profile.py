@@ -11,6 +11,7 @@ from app.repositories.profile_repository import ProfileRepository
 from app.schemas.auth import ProfileSummary
 from app.schemas.common import ApiResponse, success_response
 from app.schemas.profile import MemoryRead, MemoryUpdate, ProfileDetail, ProfileUpdate
+from app.services.effective_profile_service import EffectiveProfileService
 from app.services.profile_memory_service import ProfileMemoryService
 
 router = APIRouter(prefix="/api/v1/profile", tags=["profile"])
@@ -35,6 +36,7 @@ def get_profile(
                 else None
             ),
             memories=[MemoryRead.model_validate(value) for value in memories],
+            effective_profile=EffectiveProfileService(session).build(current_user),
         ),
     )
 
@@ -53,6 +55,7 @@ def update_profile(
         ProfileDetail(
             profile=ProfileSummary.model_validate(current_user.profile),
             memories=[MemoryRead.model_validate(value) for value in memories],
+            effective_profile=EffectiveProfileService(session).build(current_user),
         ),
     )
 

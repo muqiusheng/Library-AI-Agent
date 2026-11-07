@@ -55,6 +55,8 @@ class MessageRead(BaseModel):
 
 
 class ConversationTask(BaseModel):
+    pending_profile_updates: list[dict[str, Any]] = Field(default_factory=list)
+    pending_profile_request: str = ""
     topic: str = ""
     request: str = ""
     pending_question: str = ""

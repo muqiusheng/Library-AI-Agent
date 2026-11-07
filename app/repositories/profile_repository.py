@@ -14,7 +14,13 @@ class ProfileRepository:
         statement = select(ProfileMemory).where(ProfileMemory.user_id == user_id)
         if not include_inactive:
             statement = statement.where(ProfileMemory.is_active.is_(True))
-        return list(self.session.scalars(statement.order_by(desc(ProfileMemory.created_at))))
+        return list(
+            self.session.scalars(
+                statement.order_by(desc(ProfileMemory.created_at)).execution_options(
+                    populate_existing=True
+                )
+            )
+        )
 
     def get_owned_memory(self, memory_id: UUID, user_id: UUID) -> ProfileMemory | None:
         return self.session.scalar(
