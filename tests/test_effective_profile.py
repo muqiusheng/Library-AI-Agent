@@ -460,3 +460,35 @@ def test_legacy_low_confidence_fact_is_not_an_effective_ability(memory_session):
     )
     session.commit()
     assert "python" not in EffectiveProfileService(session).build(user)["abilities"]
+
+
+def test_source_evidence_is_loaded_only_from_owned_conversation(memory_session):
+    from app.services.conversation_service import ConversationService
+
+    session, user, conversation = memory_session
+    message = ConversationService(session).add_user_message(conversation, "我没学过 Python")
+    memory = store(memory_session, "Python", "none")
+    memory.source_message_id = message.id
+    session.commit()
+    source = EffectiveProfileService(session).build(user)["sources"]["topic:python"]
+    assert source["evidence"] == "我没学过 Python"
+    other = User(student_no="source-evidence-other", password_hash="unused")
+    session.add(other)
+    session.flush()
+    other_conversation = Conversation(user_id=other.id, title="其他用户")
+    session.add(other_conversation)
+    session.commit()
+    foreign_message = ConversationService(session).add_user_message(
+        other_conversation, "另一位用户的私有消息"
+    )
+    memory.source_message_id = foreign_message.id
+    session.commit()
+    assert (
+        EffectiveProfileService(session).build(user)["sources"]["topic:python"]["evidence"] is None
+    )
+
+
+def test_empty_goals_are_a_valid_manual_update(memory_session):
+    session, user, _ = memory_session
+    ProfileMemoryService(session).update_profile(user, ProfileUpdate(learning_goals=[]))
+    assert EffectiveProfileService(session).build(user)["learning_goals"] == []

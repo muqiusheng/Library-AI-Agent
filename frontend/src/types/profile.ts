@@ -19,6 +19,37 @@ export interface ProfileMemoryData {
 export interface ProfileDetailData {
   profile: ProfileSummary | null
   memories: ProfileMemoryData[]
+  effective_profile?: EffectiveProfile
+}
+
+export type AbilityLevel = 'none' | 'basic' | 'intermediate' | 'advanced' | 'unknown'
+
+export interface AbilityFact {
+  topic: string
+  level: AbilityLevel
+  basis?: string
+}
+
+export interface ProfileFactSource {
+  memory_id: string
+  source: MemorySource
+  source_message_id: string | null
+  is_user_edited: boolean
+  updated_at: string
+  confidence: number
+  evidence?: string | null
+}
+
+export interface EffectiveProfile {
+  grade: string
+  major: string
+  foundation: string
+  foundation_background?: string
+  learning_goals: string[]
+  interests: string[]
+  difficulty_preference: DifficultyPreference
+  abilities: Record<string, AbilityFact>
+  sources: Record<string, ProfileFactSource>
 }
 
 export interface ProfileUpdatePayload {

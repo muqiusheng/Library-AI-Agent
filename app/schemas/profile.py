@@ -12,7 +12,7 @@ class ProfileUpdate(BaseModel):
     grade: str | None = Field(default=None, min_length=1, max_length=50)
     major: str | None = Field(default=None, min_length=1, max_length=150)
     foundation: str | None = Field(default=None, min_length=1, max_length=2000)
-    learning_goals: list[str] | None = Field(default=None, min_length=1, max_length=20)
+    learning_goals: list[str] | None = Field(default=None, max_length=20)
     interests: list[str] | None = Field(default=None, max_length=30)
     difficulty_preference: DifficultyPreference | None = None
     courses: list[str] | None = Field(default=None, max_length=30)

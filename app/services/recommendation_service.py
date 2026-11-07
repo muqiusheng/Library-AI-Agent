@@ -556,7 +556,10 @@ class RecommendationService:
         if too_easy > too_hard:
             return "advanced"
         if profile is not None:
-            if "difficulty_preference" in profile.get("sources", {}):
+            if profile.get("sources", {}).get("difficulty_preference", {}).get("source") in {
+                "manual",
+                "conversation",
+            }:
                 return profile["difficulty_preference"]
             levels = [
                 item["level"]

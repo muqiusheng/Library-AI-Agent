@@ -1,9 +1,10 @@
 from datetime import UTC, datetime
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db.models import ProfileMemory, User
+from app.db.models import Conversation, Message, ProfileMemory, User
 from app.repositories.profile_repository import ProfileRepository
 from app.services.profile_fact_extractor import _has_topic, explicit_foundation, normalize_topic
 
@@ -94,14 +95,50 @@ class EffectiveProfileService:
             "abilities": {},
             "sources": {},
         }
+        if base:
+            timestamp = base.updated_at
+            timestamp = timestamp.replace(tzinfo=UTC) if timestamp.tzinfo is None else timestamp
+            for field in [*_FIELDS, "foundation"]:
+                value = profile[field]
+                profile["sources"][field] = {
+                    "memory_id": "",
+                    "source": "registration",
+                    "source_message_id": None,
+                    "is_user_edited": False,
+                    "confidence": 1.0,
+                    "updated_at": timestamp.isoformat(),
+                    "evidence": "、".join(value) if isinstance(value, list) else value,
+                }
         for ability in explicit_foundation(profile["foundation"]):
             key, _ = normalize_topic(ability["topic"])
             profile["abilities"][key] = ability
+            profile["sources"][f"topic:{key}"] = profile["sources"]["foundation"]
         winners = self.winners(user.id)
+        message_ids = {
+            memory.source_message_id
+            for memory in winners.values()
+            if memory.source_message_id is not None
+        }
+        evidence = (
+            dict(
+                self.session.execute(
+                    select(Message.id, Message.content)
+                    .join(Conversation, Message.conversation_id == Conversation.id)
+                    .where(Message.id.in_(message_ids), Conversation.user_id == user.id)
+                ).all()
+            )
+            if message_ids
+            else {}
+        )
         manual_foundation = winners.get(("profile", "foundation"))
         if manual_foundation and isinstance(manual_foundation.value_json, str):
             profile["foundation"] = manual_foundation.value_json
             profile["abilities"] = {}
+            profile["sources"] = {
+                key: value
+                for key, value in profile["sources"].items()
+                if not key.startswith("topic:")
+            }
             for ability in explicit_foundation(profile["foundation"]):
                 key, _ = normalize_topic(ability["topic"])
                 profile["abilities"][key] = ability
@@ -116,6 +153,7 @@ class EffectiveProfileService:
                 "is_user_edited": memory.is_user_edited,
                 "confidence": memory.confidence,
                 "updated_at": revision_time(memory).isoformat(),
+                "evidence": evidence.get(memory.source_message_id),
             }
             if category == "foundation":
                 if manual_foundation and revision_time(memory) < revision_time(manual_foundation):
@@ -125,6 +163,10 @@ class EffectiveProfileService:
             elif category in _FIELDS:
                 profile[category] = value
                 profile["sources"][category] = source
+            elif category == "profile" and key == "foundation":
+                profile["sources"]["foundation"] = source
+                for ability_key in profile["abilities"]:
+                    profile["sources"].setdefault(f"topic:{ability_key}", source)
         if profile["abilities"]:
             profile["foundation_background"] = profile["foundation"]
             profile["foundation"] = "；".join(
