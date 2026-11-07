@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -33,6 +34,57 @@ class ProfileMemoryService:
         self.repository = ProfileRepository(session)
         self.provider = provider or DeepSeekProvider()
         self.conflicts: list[dict] = []
+
+    def correct_fact(self, user: User, key: str, value: Any, expected: Any) -> None:
+        self._lock(user.id)
+        profile = EffectiveProfileService(self.session).build(user)
+        allowed = {"learning_goals", "interests", "major", "difficulty_preference"}
+        if key.startswith("topic:"):
+            current = profile.get("abilities", {}).get(key.removeprefix("topic:"))
+            category = "foundation"
+        elif key in allowed:
+            current, category = profile.get(key), key
+        else:
+            raise AppError(
+                status_code=422, code="INVALID_PROFILE_FACT", message="不支持更正此画像项"
+            )
+        if current is None or current != expected:
+            raise AppError(
+                status_code=409,
+                code="PROFILE_FACT_CHANGED",
+                message="这条画像已发生变化，请刷新后再更正。",
+            )
+        try:
+            normalized_category, normalized_key, normalized_value = normalize_fact(
+                category, key, value
+            )
+            if normalized_key != key:
+                raise ValueError("请保留原知识点，仅更正学习水平")
+        except (ValueError, TypeError, AttributeError) as exc:
+            raise AppError(status_code=422, code="INVALID_PROFILE_FACT", message=str(exc)) from exc
+        if category != "foundation":
+            try:
+                payload = ProfileUpdate.model_validate({key: normalized_value})
+            except ValidationError as exc:
+                raise AppError(
+                    status_code=422,
+                    code="INVALID_PROFILE_FACT",
+                    message="画像内容超出允许范围，请缩短内容或减少条目。",
+                ) from exc
+            self.update_profile(user, payload)
+            return
+        self._replace_active(
+            user_id=user.id,
+            category=normalized_category,
+            key=normalized_key,
+            value=normalized_value,
+            source=MemorySource.MANUAL,
+            confidence=1.0,
+            source_message_id=None,
+            user_edited=True,
+            protect_manual=False,
+        )
+        self.session.commit()
 
     async def extract_from_message(self, user: User, message: Message) -> list[ProfileMemory]:
         self.conflicts = []

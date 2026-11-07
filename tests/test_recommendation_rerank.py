@@ -81,6 +81,7 @@ async def test_rerank_reads_descriptions_and_applies_model_order_and_reasons():
     assert schema is RerankOutput
     assert result == [practice, theory]
     assert result[0].reason == reason
+    assert result[0].reason_source == "llm"
     assert result[0].total == 70
 
 
@@ -140,6 +141,7 @@ async def test_rerank_preserves_rule_fallback_when_model_is_unusable(mode):
 
     assert result == books
     assert all(item.reason == "初筛模板理由" for item in result)
+    assert all(item.reason_source == "rule" for item in result)
     if mode in {"offline", "no_candidates"}:
         provider.structured.assert_not_called()
 

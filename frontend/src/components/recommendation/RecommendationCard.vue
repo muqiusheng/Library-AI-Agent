@@ -5,7 +5,7 @@
       <div class="min-w-0 flex-1">
         <div class="flex items-start justify-between gap-3">
           <div><h4 class="text-base font-semibold leading-6 text-navy sm:text-lg">{{ book.title }}</h4><p class="mt-1 text-xs text-black/45">{{ book.responsible_person || '责任者未注明' }}<span v-if="book.publication_year"> · {{ book.publication_year }}</span></p></div>
-          <button class="shrink-0 rounded-full bg-amber/15 px-3 py-1.5 text-sm font-bold text-navy" @click="showScore = !showScore">{{ Math.round(book.total_score) }}%</button>
+          <button class="min-h-10 shrink-0 rounded-full bg-amber/15 px-3 py-1.5 text-xs font-medium text-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy" :aria-expanded="showScore" @click="showScore = !showScore">初筛分项</button>
         </div>
         <div class="mt-3 flex flex-wrap gap-1.5"><span v-for="topic in book.topics.slice(0, 3)" :key="topic" class="rounded-full bg-sage/10 px-2.5 py-1 text-[11px] text-sage">{{ topic }}</span><span class="rounded-full bg-paper px-2.5 py-1 text-[11px] text-black/55">{{ difficultyLabel }}</span><span class="rounded-full bg-paper px-2.5 py-1 text-[11px] text-black/55">{{ book.learning_stage }}</span></div>
         <p class="mt-3 line-clamp-3 text-sm leading-6 text-black/60">{{ book.reason }}</p>

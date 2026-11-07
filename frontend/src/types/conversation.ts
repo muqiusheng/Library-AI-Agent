@@ -1,4 +1,5 @@
 import type { RecommendationSetData } from './recommendation'
+import type { AnalysisTrace } from './analysis'
 
 export interface ConversationSummary {
   id: string
@@ -13,13 +14,18 @@ export interface MessageDto {
   role: 'user' | 'assistant' | 'system'
   content: string
   message_type: 'text' | 'recommendation' | 'path' | 'system'
-  structured_payload: { recommendation_set_id?: string } | null
+  structured_payload: { recommendation_set_id?: string; analysis?: AnalysisTrace } | null
   created_at: string
 }
 
 export interface WorkspaceMessage extends MessageDto {
   pending?: boolean
   failed?: boolean
+  stopped?: boolean
+  errorMessage?: string
+  actionError?: string
+  analysis?: AnalysisTrace
+  analysisReceivedAt?: number
   recommendation?: RecommendationSetData
 }
 

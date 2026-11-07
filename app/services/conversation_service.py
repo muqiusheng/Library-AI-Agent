@@ -60,13 +60,18 @@ class ConversationService:
         conversation: Conversation,
         content: str,
         recommendation_set_id: UUID,
+        *,
+        analysis: dict | None = None,
     ) -> Message:
         message = Message(
             conversation_id=conversation.id,
             role=MessageRole.ASSISTANT,
             content=content,
             message_type=MessageType.RECOMMENDATION,
-            structured_payload={"recommendation_set_id": str(recommendation_set_id)},
+            structured_payload={
+                "recommendation_set_id": str(recommendation_set_id),
+                **({"analysis": analysis} if analysis else {}),
+            },
             created_at=self._message_time(conversation),
         )
         self.session.add(message)
@@ -74,12 +79,15 @@ class ConversationService:
         self.session.commit()
         return message
 
-    def add_assistant_message(self, conversation: Conversation, content: str) -> Message:
+    def add_assistant_message(
+        self, conversation: Conversation, content: str, *, analysis: dict | None = None
+    ) -> Message:
         message = Message(
             conversation_id=conversation.id,
             role=MessageRole.ASSISTANT,
             content=content,
             message_type=MessageType.TEXT,
+            structured_payload={"analysis": analysis} if analysis else None,
             created_at=self._message_time(conversation),
         )
         self.session.add(message)

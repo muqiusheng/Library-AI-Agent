@@ -31,6 +31,12 @@ class MessageCreate(BaseModel):
     only_available: bool | None = None
 
 
+class RecommendationRetry(BaseModel):
+    stage: Literal["retrieving", "comparing", "generating"] = "retrieving"
+    excluded_profile_keys: list[str] | None = Field(default=None, max_length=40)
+    only_available: bool | None = None
+
+
 class ConstraintUpdate(BaseModel):
     only_available: bool | None = None
     difficulty: str | None = Field(default=None, pattern="^(beginner|intermediate|advanced)$")

@@ -1,15 +1,17 @@
 import json
 from collections.abc import AsyncIterator
+from contextlib import aclosing
 from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, Response, status
 from fastapi.responses import StreamingResponse
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
 from app.core.errors import AppError
-from app.db.models import User
+from app.db.models import Message, MessageRole, User
 from app.db.session import get_db
 from app.repositories.conversation_repository import ConversationRepository
 from app.schemas.common import ApiResponse, success_response
@@ -21,6 +23,7 @@ from app.schemas.conversation import (
     ConversationUpdate,
     MessageCreate,
     MessageRead,
+    RecommendationRetry,
 )
 from app.services.conversation_constraint_service import ConversationConstraintService
 from app.services.conversation_context_service import ConversationContextService
@@ -29,7 +32,8 @@ from app.services.conversation_turn_service import ConversationTurnService
 from app.services.effective_profile_service import EffectiveProfileService
 from app.services.general_chat_service import GeneralChatService
 from app.services.profile_memory_service import ProfileMemoryService
-from app.services.recommendation_service import RecommendationService
+from app.services.recommendation_progress import RecommendationProgress
+from app.services.recommendation_run_service import RecommendationRunService
 
 router = APIRouter(prefix="/api/v1/conversations", tags=["conversations"])
 
@@ -122,6 +126,7 @@ async def stream_message(
     request_id = request.state.request_id
 
     async def generate() -> AsyncIterator[str]:
+        progress = RecommendationProgress(str(user_message.id))
         yield _event(
             "message_start",
             {
@@ -129,6 +134,10 @@ async def stream_message(
                 "message_id": str(user_message.id),
                 "status": "understanding",
             },
+        )
+        yield _event(
+            "analysis",
+            progress.update({"stage": "understanding", "label": "正在理解需求"}),
         )
         try:
             contexts = ConversationContextService(session)
@@ -168,11 +177,25 @@ async def stream_message(
                 ):
                     text = pending_request
                 else:
-                    assistant = service.add_assistant_message(conversation, answer)
+                    analysis = progress.finish()
+                    assistant = service.add_assistant_message(
+                        conversation, answer, analysis=analysis
+                    )
+                    yield _event("analysis", analysis)
                     yield _event(
                         "message_end", {"message_id": str(assistant.id), "request_id": request_id}
                     )
                     return
+            yield _event(
+                "analysis",
+                progress.update(
+                    {
+                        "stage": "profile",
+                        "label": "正在读取学习画像",
+                        "detail": "核对本次陈述与有效画像。",
+                    }
+                ),
+            )
             await profiles.extract_from_message(current_user, user_message)
             context.profile = EffectiveProfileService(session).build(current_user)
             if profiles.conflicts:
@@ -189,12 +212,18 @@ async def stream_message(
                     "是否更新画像？请回复“确认更新”或“保留原画像”。"
                 )
                 yield _event("text_delta", {"content": answer})
-                assistant = service.add_assistant_message(conversation, answer)
+                analysis = progress.finish()
+                assistant = service.add_assistant_message(conversation, answer, analysis=analysis)
+                yield _event("analysis", analysis)
                 yield _event(
                     "message_end", {"message_id": str(assistant.id), "request_id": request_id}
                 )
                 return
             turns = ConversationTurnService()
+            yield _event(
+                "analysis",
+                progress.update({"stage": "intent", "label": "正在明确本次需求"}),
+            )
             resolution = await turns.resolve(context, text)
             turns.apply(context, resolution, text)
             contexts.save(conversation, context, commit=False)
@@ -209,6 +238,10 @@ async def stream_message(
             yield _event("constraints_updated", context.constraints.model_dump())
             general_chat = GeneralChatService(session)
             if resolution.action not in {"recommend", "refine"}:
+                yield _event(
+                    "analysis",
+                    progress.update({"stage": "generating", "label": "正在生成回复"}),
+                )
                 answer_chunks = []
                 answer = None
                 if resolution.action == "clarify":
@@ -254,7 +287,11 @@ async def stream_message(
                         yield _event("text_delta", {"content": chunk})
 
                 answer = "".join(answer_chunks)
-                assistant_message = service.add_assistant_message(conversation, answer)
+                analysis = progress.finish()
+                assistant_message = service.add_assistant_message(
+                    conversation, answer, analysis=analysis
+                )
+                yield _event("analysis", analysis)
                 yield _event(
                     "message_end",
                     {"message_id": str(assistant_message.id), "request_id": request_id},
@@ -276,37 +313,24 @@ async def stream_message(
                 elif any(word in text for word in ("换一批", "换一些", "还有别的")):
                     excluded_ids.extend(previous_ids)
             contexts.save(conversation, context)
-            recommendation = await RecommendationService(session).recommend(
-                user=current_user,
-                conversation_id=conversation.id,
-                query=turns.query(context),
-                only_available=context.constraints.only_available,
-                constraints=context.constraints.model_dump(),
-                excluded_book_ids=excluded_ids,
-                replacement_slots=slots,
+            parameters = {
+                "query": turns.query(context),
+                "only_available": context.constraints.only_available,
+                "constraints": context.constraints.model_dump(),
+                "excluded_book_ids": [str(value) for value in excluded_ids],
+                "replacement_slots": [str(value) if value else None for value in slots]
+                if slots
+                else None,
+                "excluded_profile_keys": [],
+            }
+            run = RecommendationRunService(
+                session, current_user, conversation, user_message, request_id, progress
             )
-            yield _event("message_start", {"request_id": request_id, "status": "organizing"})
-
-            summary_chunks = []
-            async for chunk in RecommendationService(session).stream_summary(
-                recommendation, current_user
-            ):
-                summary_chunks.append(chunk)
-                yield _event("text_delta", {"content": chunk})
-
-            summary = "".join(summary_chunks)
-            assistant_message = service.add_recommendation_message(
-                conversation, summary, recommendation.id
-            )
-            yield _event(
-                "recommendation_ready",
-                recommendation.model_dump(mode="json"),
-            )
-            yield _event(
-                "message_end",
-                {"message_id": str(assistant_message.id), "request_id": request_id},
-            )
+            async with aclosing(run.stream(parameters)) as events:
+                async for kind, data in events:
+                    yield _event(kind, data)
         except AppError as exc:
+            yield _event("analysis", progress.finish("error"))
             yield _event(
                 "error",
                 {"code": exc.code, "message": exc.message, "request_id": request_id},
@@ -315,6 +339,7 @@ async def stream_message(
             import traceback
 
             traceback.print_exc()
+            yield _event("analysis", progress.finish("error"))
             yield _event(
                 "error",
                 {
@@ -323,6 +348,77 @@ async def stream_message(
                     "request_id": request_id,
                 },
             )
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.post("/{conversation_id}/messages/{message_id}/retry")
+async def retry_recommendation(
+    conversation_id: UUID,
+    message_id: UUID,
+    payload: RecommendationRetry,
+    request: Request,
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_db)],
+) -> StreamingResponse:
+    conversation = ConversationRepository(session).get_owned(conversation_id, current_user.id)
+    message = session.get(Message, message_id)
+    if (
+        message is None
+        or message.conversation_id != conversation.id
+        or message.role != MessageRole.USER
+    ):
+        raise AppError(status_code=404, code="MESSAGE_NOT_FOUND", message="原始请求不存在")
+    latest = session.scalar(
+        select(Message.id)
+        .where(Message.conversation_id == conversation.id, Message.role == MessageRole.USER)
+        .order_by(Message.created_at.desc(), Message.id.desc())
+        .limit(1)
+    )
+    if latest != message_id:
+        raise AppError(
+            status_code=409, code="TURN_SUPERSEDED", message="请对最新一轮推荐进行操作。"
+        )
+    run = RecommendationRunService(
+        session, current_user, conversation, message, request.state.request_id
+    )
+    if not run.state.get("request"):
+        raise AppError(
+            status_code=409, code="NO_CHECKPOINT", message="此请求没有可恢复的推荐记录。"
+        )
+    if payload.stage not in run._stages():
+        raise AppError(
+            status_code=409, code="NO_CHECKPOINT", message="此阶段尚未完成前置步骤，请从检索重试。"
+        )
+    if payload.excluded_profile_keys is not None:
+        profile = EffectiveProfileService(session).build(current_user)
+        allowed = {"major", "interests", "learning_goals", "difficulty_preference"}
+        allowed.update(f"topic:{key}" for key in profile.get("abilities", {}))
+        allowed.update(run.state["request"].get("excluded_profile_keys", []))
+        if set(payload.excluded_profile_keys) - allowed:
+            raise AppError(
+                status_code=422, code="INVALID_PROFILE_FACT", message="本次排除项无效，请刷新画像。"
+            )
+
+    if payload.only_available is not None:
+        ConversationConstraintService(session).update(
+            conversation, ConstraintUpdate(only_available=payload.only_available)
+        )
+
+    async def generate() -> AsyncIterator[str]:
+        async with aclosing(
+            run.stream(
+                stage=payload.stage,
+                excluded_profile_keys=payload.excluded_profile_keys,
+                only_available=payload.only_available,
+            )
+        ) as events:
+            async for kind, data in events:
+                yield _event(kind, data)
 
     return StreamingResponse(
         generate(),

@@ -23,3 +23,10 @@ export async function updateMemory(id: string, value: unknown): Promise<ProfileM
 export async function deleteMemory(id: string): Promise<void> {
   await apiClient.delete(`/profile/memories/${id}`)
 }
+
+export async function correctProfileFact(key: string, value: unknown, expected: unknown): Promise<ProfileDetailData> {
+  const response = await apiClient.patch<ApiEnvelope<ProfileDetailData>>('/profile/facts', {
+    key, value_json: value, expected_value_json: expected
+  })
+  return response.data.data
+}

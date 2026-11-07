@@ -10,7 +10,13 @@ from app.db.session import get_db
 from app.repositories.profile_repository import ProfileRepository
 from app.schemas.auth import ProfileSummary
 from app.schemas.common import ApiResponse, success_response
-from app.schemas.profile import MemoryRead, MemoryUpdate, ProfileDetail, ProfileUpdate
+from app.schemas.profile import (
+    MemoryRead,
+    MemoryUpdate,
+    ProfileDetail,
+    ProfileFactCorrection,
+    ProfileUpdate,
+)
 from app.services.effective_profile_service import EffectiveProfileService
 from app.services.profile_memory_service import ProfileMemoryService
 
@@ -58,6 +64,19 @@ def update_profile(
             effective_profile=EffectiveProfileService(session).build(current_user),
         ),
     )
+
+
+@router.patch("/facts", response_model=ApiResponse[ProfileDetail])
+def correct_profile_fact(
+    payload: ProfileFactCorrection,
+    request: Request,
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_db)],
+) -> dict:
+    ProfileMemoryService(session).correct_fact(
+        current_user, payload.key, payload.value_json, payload.expected_value_json
+    )
+    return get_profile(request, current_user, session, include_history=False)
 
 
 @router.patch("/memories/{memory_id}", response_model=ApiResponse[MemoryRead])

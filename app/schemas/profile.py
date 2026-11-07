@@ -40,6 +40,12 @@ class MemoryUpdate(BaseModel):
     value_json: dict[str, Any] | list[Any] | str | int | float | bool
 
 
+class ProfileFactCorrection(BaseModel):
+    key: str = Field(min_length=1, max_length=100)
+    value_json: dict[str, Any] | list[Any] | str
+    expected_value_json: dict[str, Any] | list[Any] | str
+
+
 class ProfileDetail(BaseModel):
     profile: ProfileSummary | None
     memories: list[MemoryRead]
