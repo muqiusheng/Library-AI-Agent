@@ -33,7 +33,7 @@
           <button v-for="item in conversation.conversations" :key="item.id" class="group flex w-full items-center gap-2 rounded-lg px-2 py-2.5 text-left text-sm" :class="item.id === conversation.activeId ? 'bg-ink/5 font-medium' : 'text-ink/65 hover:bg-ink/5'" @click="selectConversation(item.id)">
             <svg class="h-4 w-4 shrink-0 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
             <span class="block min-w-0 flex-1 truncate">{{ item.title }}</span>
-            <span class="invisible text-ink/35 hover:text-red-500 group-hover:visible" @click.stop="conversation.removeConversation(item.id)">×</span>
+            <span class="invisible text-ink/35 hover:text-red-500 group-hover:visible" @click.stop="deleteConversation(item.id)">×</span>
           </button>
           <p v-if="!conversation.loading && !conversation.conversations.length" class="px-2 py-4 text-xs text-ink/40">
             暂无历史对话
@@ -170,6 +170,10 @@ async function createConversation() {
   mobileMenuOpen.value = false 
 }
 async function selectConversation(id: string) { await conversation.selectConversation(id); mobileMenuOpen.value = false }
+async function deleteConversation(id: string) {
+  if (!window.confirm('确定删除该对话吗？删除后无法恢复。')) return
+  await conversation.removeConversation(id)
+}
 async function send() { const value = draft.value; if (!value.trim()) return; draft.value = ''; await conversation.send(value) }
 async function createPath(setId: string) { const path = await createLearningPath(setId); await router.push(`/personal-center/paths/${path.id}`) }
 async function signOut() { 
