@@ -15,7 +15,7 @@
       </div>
       
       <!-- New Chat Button -->
-      <button class="mt-5 flex min-h-10 w-full items-center justify-between rounded-xl bg-paper px-3 text-sm font-medium shadow-sm ring-1 ring-ink/5 hover:bg-ink/5" @click="createConversation">
+      <button ref="newChatButton" class="mt-5 flex min-h-10 w-full items-center justify-between rounded-xl bg-paper px-3 text-sm font-medium shadow-sm ring-1 ring-ink/5 hover:bg-ink/5" @click="createConversation">
         <div class="flex items-center gap-2">
           <svg class="h-4 w-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
           <span>新对话</span>
@@ -30,11 +30,15 @@
           <div v-if="conversation.loading" class="space-y-1">
             <div v-for="n in 3" :key="n" class="h-10 animate-pulse rounded-lg bg-ink/5" />
           </div>
-          <button v-for="item in conversation.conversations" :key="item.id" class="group flex w-full items-center gap-2 rounded-lg px-2 py-2.5 text-left text-sm" :class="item.id === conversation.activeId ? 'bg-ink/5 font-medium' : 'text-ink/65 hover:bg-ink/5'" @click="selectConversation(item.id)">
+          <div v-for="item in conversation.conversations" :key="item.id" class="group flex w-full items-center rounded-lg text-left text-sm" :class="item.id === conversation.activeId ? 'bg-ink/5 font-medium' : 'text-ink/65 hover:bg-ink/5'">
+            <button type="button" class="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-2.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy" @click="selectConversation(item.id)">
             <svg class="h-4 w-4 shrink-0 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
             <span class="block min-w-0 flex-1 truncate">{{ item.title }}</span>
-            <span class="invisible text-ink/35 hover:text-red-500 group-hover:visible" @click.stop="deleteConversation(item.id)">×</span>
-          </button>
+            </button>
+            <button type="button" :aria-label="`删除对话：${item.title}`" aria-haspopup="dialog" :aria-expanded="deletionTarget?.id === item.id" class="mr-1 grid h-8 w-8 shrink-0 place-items-center rounded-lg text-ink/50 hover:bg-red-50 hover:text-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-700 lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100" @click.stop="openDeleteConversation(item.id, item.title, $event)">
+              <svg aria-hidden="true" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18" /></svg>
+            </button>
+          </div>
           <p v-if="!conversation.loading && !conversation.conversations.length" class="px-2 py-4 text-xs text-ink/40">
             暂无历史对话
           </p>
@@ -88,6 +92,7 @@
       </section>
     <BookDetailDrawer :book="selectedBook" @close="selectedBook = null" />
     <NotificationPanel v-if="notificationOpen" @close="notificationOpen = false" />
+    <DeleteConversationPopover v-if="deletionTarget" :key="deletionTarget.id" :anchor="deletionTarget.anchor" :title="deletionTarget.title" :busy="deletingConversation" :error="deletionError" @close="closeDeleteConversation" @confirm="deleteConversation" />
   </main>
 </template>
 
@@ -97,6 +102,7 @@ import { useRouter } from 'vue-router'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { createLearningPath } from '@/api/learningPaths'
+import DeleteConversationPopover from '@/components/conversation/DeleteConversationPopover.vue'
 import NotificationPanel from '@/components/notification/NotificationPanel.vue'
 import BookDetailDrawer from '@/components/recommendation/BookDetailDrawer.vue'
 import RecommendationCard from '@/components/recommendation/RecommendationCard.vue'
@@ -112,6 +118,10 @@ import type { RecommendationCardData } from '@/types/recommendation'
 const auth = useAuthStore(); const conversation = useConversationStore(); const notifications = useNotificationStore(); const router = useRouter()
 const mobileMenuOpen = ref(false); const desktopSidebarOpen = ref(true); const notificationOpen = ref(false); const draft = ref(''); const selectedBook = ref<RecommendationCardData | null>(null); const messagePane = ref<HTMLElement | null>(null)
 const sidebarWidth = ref(260); const isDragging = ref(false); const startX = ref(0); const startWidth = ref(0);
+const newChatButton = ref<HTMLButtonElement | null>(null)
+const deletionTarget = ref<{ id: string; title: string; anchor: HTMLElement } | null>(null)
+const deletingConversation = ref(false)
+const deletionError = ref('')
 const prompts = ref<ConversationStarter[]>([...DEFAULT_STARTERS])
 const startersLoading = ref(true)
 const starterSending = ref(false)
@@ -203,10 +213,30 @@ async function createConversation() {
   await refreshStarters()
 }
 async function selectConversation(id: string) { await conversation.selectConversation(id); mobileMenuOpen.value = false; await refreshStarters() }
-async function deleteConversation(id: string) {
-  if (!window.confirm('确定删除该对话吗？删除后无法恢复。')) return
-  await conversation.removeConversation(id)
-  await refreshStarters()
+function openDeleteConversation(id: string, title: string, event: MouseEvent) {
+  if (deletingConversation.value) return
+  deletionError.value = ''
+  deletionTarget.value = { id, title, anchor: event.currentTarget as HTMLElement }
+}
+function closeDeleteConversation() {
+  if (!deletingConversation.value) deletionTarget.value = null
+}
+async function deleteConversation() {
+  if (!deletionTarget.value || deletingConversation.value) return
+  const target = deletionTarget.value
+  deletingConversation.value = true
+  deletionError.value = ''
+  try {
+    await conversation.removeConversation(target.id)
+    deletionTarget.value = null
+    await nextTick()
+    if (!target.anchor.isConnected) newChatButton.value?.focus({ preventScroll: true })
+    await refreshStarters()
+  } catch (error) {
+    deletionError.value = getApiErrorMessage(error, '删除失败，请重试')
+  } finally {
+    deletingConversation.value = false
+  }
 }
 async function send() { if (starterSending.value || conversation.isStreaming) return; const value = draft.value; if (!value.trim()) return; draft.value = ''; await conversation.send(value) }
 async function createPath(setId: string) { const path = await createLearningPath(setId); await router.push(`/personal-center/paths/${path.id}`) }
