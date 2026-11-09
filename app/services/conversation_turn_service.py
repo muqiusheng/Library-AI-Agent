@@ -7,6 +7,13 @@ from app.services.conversation_context_service import ConversationContext
 
 logger = logging.getLogger(__name__)
 
+_STARTER_QUESTIONS = {
+    "入门一个新领域": "你想学习哪个领域？之前接触过吗？",
+    "找课程或考试参考书": "你正在学习什么课程，或准备什么考试？",
+    "为项目或论文找资料": "你的项目或论文是什么主题？目前需要解决什么问题？",
+    "按兴趣找几本好书": "你最近对什么话题感兴趣？也可以告诉我一本喜欢的书。",
+}
+
 _PROMPT = """你负责解析图书馆连续对话，只返回符合结构的结果。
 action: recommend=首次或新主题荐书；refine=调整、换书、补充条件；
 explain=解释已推荐图书；availability=查询指定图书可借状态；chat=普通知识问答；
@@ -19,6 +26,7 @@ standalone_query 只保留主题和学习目标，不夹带难度、排除、可
 constraints 只填写用户本轮明确变更的字段，不要复制旧值；撤销难度用 null，撤销排除用 []。
 不要把帮朋友找书或本次条件写成长期画像。explain 和 availability 不重新推荐。
 澄清回复应结合 pending_question 理解。普通知识问答不要转成荐书。
+澄清每轮只问最关键的一两个问题；历史中已明确的学习基础与目标不重复询问。
 """
 
 
@@ -27,6 +35,11 @@ class ConversationTurnService:
         self.provider = provider or DeepSeekProvider()
 
     async def resolve(self, context: ConversationContext, text: str) -> TurnResolution:
+        if text.strip() in _STARTER_QUESTIONS:
+            return TurnResolution(
+                action="clarify", new_topic=True,
+                clarification=_STARTER_QUESTIONS[text.strip()],
+            )
         result = self.fallback(context, text)
         if self.provider.available:
             try:
@@ -123,6 +136,8 @@ class ConversationTurnService:
 
     @staticmethod
     def fallback(context: ConversationContext, text: str) -> TurnResolution:
+        if text.strip() in _STARTER_QUESTIONS:
+            return TurnResolution(action="clarify", new_topic=True, clarification=_STARTER_QUESTIONS[text.strip()])
         action = "chat"
         rank = ConversationTurnService.rank(text)
         named_book = bool(
@@ -179,6 +194,9 @@ class ConversationTurnService:
             "机器学习",
         }:
             action = "clarify"
+        if context.task.pending_question in _STARTER_QUESTIONS and action == "chat":
+            # A subject supplied in response to an entry question is a book request.
+            action = "recommend"
         request = text if new_topic or not context.task.request else context.task.request
         if context.task.request and not new_topic and action == "refine":
             # Preserve learning goals without turning ordinal references into search terms.
@@ -197,6 +215,9 @@ class ConversationTurnService:
     @staticmethod
     def apply(context: ConversationContext, result: TurnResolution, text: str) -> str:
         if result.action == "clarify":
+            if text.strip() in _STARTER_QUESTIONS:
+                context.task = ConversationTask()
+                context.constraints = ConstraintRead()
             context.task.pending_question = text
             return text
         if result.action not in {"recommend", "refine"}:

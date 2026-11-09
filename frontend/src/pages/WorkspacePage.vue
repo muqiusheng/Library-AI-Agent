@@ -80,11 +80,11 @@
       <header class="flex items-center justify-between gap-3 border-b border-ink/5 px-4 py-4 sm:px-6"><div class="flex min-w-0 items-center gap-3"><button class="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-ink/10 lg:hidden" @click="mobileMenuOpen = true">☰</button><button class="hidden h-10 w-10 shrink-0 place-items-center rounded-xl border border-ink/10 text-ink/50 hover:bg-ink/5 lg:grid" @click="desktopSidebarOpen = !desktopSidebarOpen"><svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7" /></svg></button><div class="min-w-0"><h2 class="truncate font-semibold text-navy">{{ conversation.activeConversation?.title || '新会话' }}</h2></div></div><div class="flex items-center gap-3"><label class="hidden items-center gap-2 text-xs text-ink/50 sm:flex"><input v-model="conversation.onlyAvailable" class="accent-navy" type="checkbox" />只看在馆可借</label><button class="relative flex h-10 items-center justify-center rounded-xl border border-ink/10 px-4 text-sm font-medium text-navy" aria-label="通知" @click="notificationOpen = true">消息<span v-if="notifications.unreadCount" class="absolute -right-1 -top-1 grid min-h-5 min-w-5 place-items-center rounded-full bg-red-500 px-1 text-[10px] text-white">{{ notifications.unreadCount }}</span></button></div></header>
 
         <div ref="messagePane" class="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-7">
-          <div v-if="!conversation.messages.length" class="mx-auto flex h-full max-w-xl flex-col items-center justify-center text-center"><p class="mt-5 text-sm text-ink/40">你好，{{ auth.user?.display_name || auth.user?.student_no }}</p><h3 class="mt-2 text-2xl font-semibold text-navy">描述你的学习目标</h3><p class="mt-3 text-sm leading-7 text-ink/55">我会从 41,774 本真实书目和 113,204 个馆藏副本中，为你筛选适合的阅读起点。</p><div class="mt-7 grid w-full gap-3 text-left sm:grid-cols-2"><button v-for="prompt in prompts" :key="prompt" class="min-h-12 rounded-2xl border border-ink/10 p-4 text-sm hover:border-navy text-ink" @click="draft = prompt">{{ prompt }}</button></div></div>
+          <div v-if="!conversation.messages.length" class="mx-auto flex h-full max-w-xl flex-col items-center justify-center text-center"><p class="mt-5 text-sm text-ink/40">你好，{{ auth.user?.display_name || auth.user?.student_no }}</p><h3 class="mt-2 max-w-full break-words text-xl font-semibold text-navy sm:text-2xl">{{ prompts.some(item => item.conversationId) ? '继续之前的目标，或探索新方向' : '你想从哪里开始？' }}</h3><p class="mt-3 text-sm leading-7 text-ink/55">我会从 41,774 本真实书目和 113,204 个馆藏副本中，为你筛选适合的阅读起点。</p><div class="mt-7 grid w-full gap-3 text-left sm:grid-cols-2"><button v-for="prompt in prompts" :key="prompt.id" type="button" :title="prompt.label" :disabled="startersLoading || starterSending || conversation.isStreaming" class="min-h-12 min-w-0 rounded-2xl border border-ink/10 p-4 text-sm text-ink hover:border-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-navy disabled:cursor-wait disabled:opacity-50" @click="sendStarter(prompt)"><span class="line-clamp-2 break-words">{{ prompt.label }}</span></button></div></div>
           <div v-else class="mx-auto max-w-4xl space-y-7"><div v-for="message in conversation.messages" :key="message.id" :class="message.role === 'user' ? 'flex justify-end' : ''"><div v-if="message.role === 'user'" class="max-w-[85%] rounded-2xl rounded-br-md bg-navy px-4 py-3 text-sm leading-6 text-white sm:max-w-[70%]">{{ message.content }}</div><div v-else class="space-y-4"><div class="flex items-start gap-3"><div class="min-w-0 flex-1"><RecommendationProcess v-if="message.analysis" class="mb-4" :trace="message.analysis" :received-at="message.analysisReceivedAt" :can-act="conversation.canOperate(message)" :busy="conversation.isStreaming" :action-error="message.actionError" @retry="conversation.retryStage(message, $event)" @exclude="conversation.retryStage(message, 'retrieving', $event)" @corrected="conversation.retryStage(message, 'retrieving')" /><div v-if="message.content" class="prose prose-sm max-w-none text-ink/80 prose-p:leading-7 prose-a:text-navy hover:prose-a:text-navy-light prose-li:my-0.5" v-html="renderMarkdown(message.content)"></div><div v-if="message.pending && !message.analysis" class="mt-2 flex items-center gap-2 text-xs text-sage"><span class="h-2 w-2 animate-pulse rounded-full bg-sage" />{{ statusLabel }}</div><div v-if="message.failed" class="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">{{ message.errorMessage || conversation.errorMessage }} <button class="ml-2 font-semibold underline" @click="conversation.retry">重试</button></div></div></div><div v-if="message.recommendation" class="grid gap-4 xl:grid-cols-2"><RecommendationCard v-for="book in message.recommendation.items" :key="book.book_id" :book="book" :set-id="message.recommendation.id" @detail="selectedBook = $event" @add-to-path="createPath(message.recommendation.id)" /><RouterLink class="rounded-2xl border border-dashed border-sage/30 p-4 text-center text-sm font-medium text-sage xl:col-span-2" :to="`/evaluate/${message.recommendation.id}`">参与匿名人工评测（1–5 分）</RouterLink></div></div></div></div>
         </div>
 
-        <footer class="border-t border-ink/5 bg-paper px-3 py-3 sm:px-6"><div class="mx-auto max-w-4xl"><label class="mb-2 flex items-center gap-2 text-xs text-ink/45 sm:hidden"><input v-model="conversation.onlyAvailable" class="accent-navy" type="checkbox" />只看在馆可借</label><form class="flex items-end gap-2 rounded-2xl border border-ink/10 bg-ink/5 p-2 sm:p-3" @submit.prevent="send"><textarea v-model="draft" aria-label="输入消息" class="max-h-32 min-h-12 flex-1 resize-none bg-transparent px-2 py-2 text-sm outline-none" @keydown.enter.exact.prevent="send" /><button v-if="conversation.isStreaming" class="min-h-11 rounded-xl border border-navy px-4 text-sm font-semibold text-navy" type="button" @click="conversation.stop">停止</button><button v-else class="min-h-11 rounded-xl bg-navy px-5 text-sm font-semibold text-white" type="submit">发送</button></form><p class="mt-2 text-center text-[11px] text-ink/35">推荐仅来自当前已发布馆藏，AI 不会编造书目和位置。</p></div></footer>
+        <footer class="border-t border-ink/5 bg-paper px-3 py-3 sm:px-6"><div class="mx-auto max-w-4xl"><label class="mb-2 flex items-center gap-2 text-xs text-ink/45 sm:hidden"><input v-model="conversation.onlyAvailable" class="accent-navy" type="checkbox" />只看在馆可借</label><p v-if="starterError" role="alert" class="mb-2 text-sm text-red-700">{{ starterError }}</p><form class="flex items-end gap-2 rounded-2xl border border-ink/10 bg-ink/5 p-2 sm:p-3" @submit.prevent="send"><textarea v-model="draft" aria-label="输入消息" class="max-h-32 min-h-12 min-w-0 flex-1 resize-none bg-transparent px-2 py-2 text-sm outline-none" @keydown.enter.exact.prevent="send" /><button v-if="conversation.isStreaming" class="min-h-11 rounded-xl border border-navy px-4 text-sm font-semibold text-navy" type="button" @click="conversation.stop">停止</button><button v-else class="min-h-11 shrink-0 rounded-xl bg-navy px-5 text-sm font-semibold text-white" type="submit">发送</button></form><p class="mt-2 text-center text-[11px] text-ink/35">推荐仅来自当前已发布馆藏，AI 不会编造书目和位置。</p></div></footer>
       </section>
     <BookDetailDrawer :book="selectedBook" @close="selectedBook = null" />
     <NotificationPanel v-if="notificationOpen" @close="notificationOpen = false" />
@@ -101,6 +101,8 @@ import NotificationPanel from '@/components/notification/NotificationPanel.vue'
 import BookDetailDrawer from '@/components/recommendation/BookDetailDrawer.vue'
 import RecommendationCard from '@/components/recommendation/RecommendationCard.vue'
 import RecommendationProcess from '@/components/recommendation/RecommendationProcess.vue'
+import { DEFAULT_STARTERS, loadConversationStarters, sendConversationStarter, type ConversationStarter } from '@/utils/conversationStarters'
+import { getApiErrorMessage } from '@/utils/apiError'
 import { useAuthStore } from '@/stores/auth'
 import { useConversationStore } from '@/stores/conversation'
 import { useNotificationStore } from '@/stores/notifications'
@@ -110,7 +112,36 @@ import type { RecommendationCardData } from '@/types/recommendation'
 const auth = useAuthStore(); const conversation = useConversationStore(); const notifications = useNotificationStore(); const router = useRouter()
 const mobileMenuOpen = ref(false); const desktopSidebarOpen = ref(true); const notificationOpen = ref(false); const draft = ref(''); const selectedBook = ref<RecommendationCardData | null>(null); const messagePane = ref<HTMLElement | null>(null)
 const sidebarWidth = ref(260); const isDragging = ref(false); const startX = ref(0); const startWidth = ref(0);
-const prompts = ['从零开始学习 Java', '为数据库课程找拓展阅读', '了解人工智能基础', '生成项目实践阅读路线']
+const prompts = ref<ConversationStarter[]>([...DEFAULT_STARTERS])
+const startersLoading = ref(true)
+const starterSending = ref(false)
+const starterError = ref('')
+let startersRequest = 0
+
+async function refreshStarters() {
+  const request = ++startersRequest
+  if (conversation.messages.length) { startersLoading.value = false; return }
+  startersLoading.value = true
+  const activeId = conversation.activeId
+  const values = await loadConversationStarters(conversation.conversations, activeId)
+  if (request === startersRequest && activeId === conversation.activeId) {
+    prompts.value = values
+    startersLoading.value = false
+  }
+}
+
+async function sendStarter(starter: ConversationStarter) {
+  if (starterSending.value || startersLoading.value || conversation.isStreaming) return
+  starterSending.value = true
+  starterError.value = ''
+  try {
+    await sendConversationStarter(starter, conversation)
+  } catch (error) {
+    starterError.value = getApiErrorMessage(error, '发送失败，请稍后重试')
+  } finally {
+    starterSending.value = false
+  }
+}
 
 function startResize(e: MouseEvent) {
   isDragging.value = true
@@ -161,20 +192,23 @@ onMounted(async () => {
       await conversation.newConversation()
     }
   }
+  await refreshStarters()
 })
 watch(() => conversation.messages, async () => { await nextTick(); if (messagePane.value) messagePane.value.scrollTop = messagePane.value.scrollHeight }, { deep: true })
 async function createConversation() { 
   const emptyConv = conversation.conversations.find(c => c.title === '新会话')
   if (emptyConv) await conversation.selectConversation(emptyConv.id)
   else await conversation.newConversation()
-  mobileMenuOpen.value = false 
+  mobileMenuOpen.value = false
+  await refreshStarters()
 }
-async function selectConversation(id: string) { await conversation.selectConversation(id); mobileMenuOpen.value = false }
+async function selectConversation(id: string) { await conversation.selectConversation(id); mobileMenuOpen.value = false; await refreshStarters() }
 async function deleteConversation(id: string) {
   if (!window.confirm('确定删除该对话吗？删除后无法恢复。')) return
   await conversation.removeConversation(id)
+  await refreshStarters()
 }
-async function send() { const value = draft.value; if (!value.trim()) return; draft.value = ''; await conversation.send(value) }
+async function send() { if (starterSending.value || conversation.isStreaming) return; const value = draft.value; if (!value.trim()) return; draft.value = ''; await conversation.send(value) }
 async function createPath(setId: string) { const path = await createLearningPath(setId); await router.push(`/personal-center/paths/${path.id}`) }
 async function signOut() { 
   if (conversation.activeId && conversation.messages.length === 0) {
