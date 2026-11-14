@@ -213,34 +213,17 @@ class NeedClarificationService:
         query = self._build_query(state)
 
         if extracted is None:
-            # 不伪造对本轮回答的结构化理解。
-            state.pending_fields = []
-
-            self.constraints.save_learning_need(
-                conversation,
-                state,
-            )
-
-            # 带上最近对话中的原始用户补充，
-            # 避免故障时丢失澄清上下文。
-            history = ConversationRepository(
-                self.session
-            ).messages(conversation.id, user.id)[-8:]
-
-            user_inputs = [
-                item.content
-                for item in history
-                if item.role.value == "user"
-            ]
-
-            if user_inputs:
-                query += (
-                    "\n近期用户原始表达：\n"
-                    + "\n".join(user_inputs)
-                )
-
-            return ClarificationResult(
-                question=None,
+            # 不拼接历史消息，避免混入旧主题。
+            # 不清除 pending_fields，也不保存不确定的新状态。
+                return ClarificationResult(
+                question=(
+                    "暂时无法准确理解本次需求，"
+                    "本轮尚未执行图书推荐。"
+                    "请稍后重新发送本次完整的选书需求，"
+                    "包含学习主题和希望补充的条件。"
+                ),
+                # 保持非空：当前 API 用空 query 表示取消选书。
+                # API 收到 question 后会返回提示，不会执行此查询。
                 query=query,
             )
 
