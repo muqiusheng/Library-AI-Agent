@@ -36,7 +36,11 @@ class ConversationSummary(BaseModel):
 
 class MessageCreate(BaseModel):
     content: str = Field(min_length=1, max_length=4000)
-    only_available: bool = False
+
+    # None：保持原条件
+    # True：只看可借
+    # False：取消可借限制
+    only_available: bool | None = None
 
 
 NeedField = Literal[

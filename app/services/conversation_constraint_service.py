@@ -76,37 +76,55 @@ class ConversationConstraintService:
         self._assign(conversation, current)
         self.session.commit()
 
-    def update_from_message(
+        def update_from_message(
         self,
         conversation: Conversation,
         text: str,
         *,
-        only_available: bool,
+        only_available: bool | None = None,
     ) -> ConstraintRead:
         changes: dict = {}
 
-        if only_available or any(
-            value in text
-            for value in (
-                "只看可借",
-                "在馆可借",
-                "必须可借",
-            )
-        ):
-            changes["only_available"] = True
-
-        elif any(
-            value in text
-            for value in (
+        # 先判断否定表达，避免“不必只看可借”
+        # 被其中的“只看可借”误判。
+        cancel_availability = any(
+            phrase in text
+            for phrase in (
+                "不必只看可借",
+                "不用只看可借",
+                "不只看可借",
                 "不限可借",
                 "借不到也可以",
+                "不可借也可以",
+                "取消可借限制",
+                "取消只看可借",
+                "不要求在馆可借",
             )
-        ):
-            changes["only_available"] = False
+        )
 
+        require_availability = any(
+            phrase in text
+            for phrase in (
+                "只看可借",
+                "只要可借",
+                "在馆可借",
+                "必须可借",
+                "仅推荐可借",
+            )
+        )
+
+        # 明确的文字要求优先于页面开关。
+        if cancel_availability:
+            changes["only_available"] = False
+        elif require_availability:
+            changes["only_available"] = True
+        elif only_available is not None:
+            changes["only_available"] = only_available
+
+        # 更新难度偏好。
         if any(
-            value in text
-            for value in (
+            phrase in text
+            for phrase in (
                 "简单一点",
                 "简单点",
                 "太难",
@@ -116,8 +134,8 @@ class ConversationConstraintService:
             changes["difficulty"] = "beginner"
 
         elif any(
-            value in text
-            for value in (
+            phrase in text
+            for phrase in (
                 "难一点",
                 "进阶一些",
                 "更有挑战",
@@ -125,6 +143,7 @@ class ConversationConstraintService:
         ):
             changes["difficulty"] = "advanced"
 
+        # 保留现有的排除关键词提取逻辑。
         excluded = re.findall(
             r"(?:不要|排除|不想看)"
             r"([A-Za-z+#.]{2,20}|[\u4e00-\u9fff]{2,8})",
@@ -138,6 +157,7 @@ class ConversationConstraintService:
                 dict.fromkeys([*current, *excluded])
             )[:20]
 
+        # 本轮未改变条件时，返回原有条件。
         if not changes:
             return self.get(conversation)
 

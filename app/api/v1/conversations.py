@@ -446,9 +446,7 @@ async def stream_message(
                     constraints_service.update_from_message(
                         conversation,
                         text,
-                        only_available=bool(
-                            payload.only_available
-                        ),
+                        only_available=payload.only_available,
                     )
                 )
 
