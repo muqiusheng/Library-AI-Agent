@@ -54,7 +54,10 @@ NeedField = Literal[
 class LearningNeedState(BaseModel):
     topic: str | None = Field(default=None, max_length=4000)
     foundation: str | None = Field(default=None, max_length=1000)
-
+    learning_goal: str | None = Field(
+    default=None,
+    max_length=2000,
+)
     basics_preference: Literal[
         "first", "skip", "any"
     ] | None = None

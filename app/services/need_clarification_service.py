@@ -40,7 +40,10 @@ class NeedExtraction(BaseModel):
         default=None,
         max_length=1000,
     )
-
+    learning_goal: str | None = Field(
+    default=None,
+    max_length=2000,
+)
     basics_preference: Literal[
         "first", "skip", "any"
     ] | None = None
@@ -191,12 +194,13 @@ class NeedClarificationService:
                 state = LearningNeedState()
 
             for field in (
-                "topic",
-                "foundation",
-                "basics_preference",
-                "language_preference",
-                "content_preference",
-            ):
+    "topic",
+    "foundation",
+    "learning_goal",
+    "basics_preference",
+    "language_preference",
+    "content_preference",
+):
                 value = getattr(extracted, field)
 
                 if value is not None:
@@ -399,6 +403,19 @@ class NeedClarificationService:
             "明确取消本次选书为 cancel。"
             "用户主动询问是否可以直接推荐，"
             "不一定等于已经要求执行。"
+            "\n"
+            "learning_goal 保存用户的具体用途、任务、应用场景、"
+            "希望解决的问题，以及明确的时间要求。"
+            "例如用户说“想学数据挖掘，用于毕业论文的客户流失预测”，"
+            "topic 为“数据挖掘”，"
+            "learning_goal 为“用于毕业论文，研究客户流失预测”。"
+            "同一主题下，用户补充目标时，结合 current_state.learning_goal "
+            "返回合并后的完整目标，保留仍然有效的用途和要求。"
+            "用户明确撤销或修改某个目标时，以最新表达为准，"
+            "不要继续保留已撤销的目标；明确取消全部具体目标时返回空字符串。"
+            "本轮没有涉及目标时返回 null，由程序保留原值。"
+            "切换主题时只提取新主题的目标，不沿用旧主题的用途。"
+            "不要凭空推测目标，也不要把本次任务当作长期兴趣。"
         )
 
         try:
@@ -436,6 +453,11 @@ class NeedClarificationService:
             lines.append(
                 f"已有基础：{state.foundation}"
             )
+
+        if state.learning_goal:
+            lines.append(
+                f"具体学习目标：{state.learning_goal}"
+    )
 
         labels = {
             "basics_preference": {
