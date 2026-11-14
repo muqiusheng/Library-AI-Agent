@@ -102,3 +102,44 @@ class MessageRead(BaseModel):
     message_type: MessageType
     structured_payload: dict[str, Any] | None
     created_at: datetime
+
+class RecommendationRetry(BaseModel):
+    stage: Literal[
+        "retrieving", "comparing", "generating"
+    ] = "retrieving"
+    excluded_profile_keys: list[str] | None = Field(
+        default=None, max_length=40
+    )
+    only_available: bool | None = None
+
+
+class ConversationTask(BaseModel):
+    pending_profile_updates: list[dict[str, Any]] = Field(
+        default_factory=list
+    )
+    pending_profile_request: str = ""
+    topic: str = ""
+    request: str = ""
+    pending_question: str = ""
+    excluded_book_ids: list[UUID] = Field(default_factory=list)
+    focused_book_id: UUID | None = None
+
+
+class TurnResolution(BaseModel):
+    action: Literal[
+        "recommend",
+        "refine",
+        "explain",
+        "availability",
+        "chat",
+        "clarify",
+    ]
+    topic: str = ""
+    standalone_query: str = ""
+    new_topic: bool = False
+    keep_constraints: bool = False
+    target_rank: int | None = Field(default=None, ge=1)
+    clarification: str = ""
+    constraints: ConstraintUpdate = Field(
+        default_factory=ConstraintUpdate
+    )
