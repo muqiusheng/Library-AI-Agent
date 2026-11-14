@@ -650,25 +650,22 @@ async def stream_message(
                 # 避免旧主题重新混入推荐查询。
                 need = context.constraints.learning_need
 
+                # 每次澄清完成，都保存完整需求。
+                if need.topic:
+                    context.task.topic = need.topic
+
+                context.task.request = result.query
+                context.task.pending_question = ""
+
+                # 只有回答追问时，才重置本轮换书状态。
                 if waiting_for_answer:
-                    # 每次澄清完成，都保存主题和完整需求，
-                    # 后续换书时继续使用这些信息。
-                    if need.topic:
-                        context.task.topic = need.topic
+                    context.task.excluded_book_ids = []
+                    context.task.focused_book_id = None
 
-                    context.task.request = result.query
-                    context.task.pending_question = ""
+                    resolution.target_rank = None
+                    resolution.action = "recommend"
 
-                    # 回答追问后，按完整需求开始推荐。
-                    # 这些重置操作只在等待追问答案时执行。
-                    if waiting_for_answer:
-                        context.task.excluded_book_ids = []
-                        context.task.focused_book_id = None
-
-                        resolution.target_rank = None
-                        resolution.action = "recommend"
-
-                    effective_query = result.query
+                effective_query = result.query
 
                 # 仍需带上用户有效的可借、排除和难度条件。
                 if context.constraints.difficulty:

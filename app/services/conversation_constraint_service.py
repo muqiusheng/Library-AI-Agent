@@ -76,7 +76,7 @@ class ConversationConstraintService:
         self._assign(conversation, current)
         self.session.commit()
 
-        def update_from_message(
+    def update_from_message(
         self,
         conversation: Conversation,
         text: str,
