@@ -653,17 +653,24 @@ async def stream_message(
                 need = context.constraints.learning_need
 
                 if waiting_for_answer:
+                    # 每次澄清完成，都保存主题和完整需求，
+                    # 后续换书时继续使用这些信息。
                     if need.topic:
                         context.task.topic = need.topic
 
                     context.task.request = result.query
-                    context.task.excluded_book_ids = []
-                    context.task.focused_book_id = None
+                    context.task.pending_question = ""
 
-                    resolution.target_rank = None
-                    resolution.action = "recommend"
+                    # 回答追问后，按完整需求开始推荐。
+                    # 这些重置操作只在等待追问答案时执行。
+                    if waiting_for_answer:
+                        context.task.excluded_book_ids = []
+                        context.task.focused_book_id = None
 
-                effective_query = result.query
+                        resolution.target_rank = None
+                        resolution.action = "recommend"
+
+                    effective_query = result.query
 
                 # 仍需带上用户有效的可借、排除和难度条件。
                 if context.constraints.difficulty:
