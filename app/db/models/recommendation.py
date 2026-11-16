@@ -176,7 +176,7 @@ class LearningPathBook(Base):
     position: Mapped[int] = mapped_column(Integer, nullable=False)
     state: Mapped[BookUserStateValue] = mapped_column(
         Enum(BookUserStateValue, values_callable=enum_values, native_enum=False, length=20),
-        default=BookUserStateValue.WANT_TO_READ,
+        default=BookUserStateValue.NOT_STARTED,
         nullable=False,
     )
 

@@ -20,6 +20,7 @@ from app.api.v1.evaluations import router as evaluations_router
 from app.api.v1.health import router as health_router
 from app.api.v1.learning_paths import router as learning_paths_router
 from app.api.v1.profile import router as profile_router
+from app.api.v1.reading_interest import router as reading_interest_router
 from app.api.v1.recommendations import router as recommendations_router
 from app.api.v1.reservations import router as reservations_router
 from app.core.config import get_settings
@@ -88,6 +89,7 @@ def create_app() -> FastAPI:
     application.include_router(admin_access_router)
     application.include_router(conversations_router)
     application.include_router(recommendations_router)
+    application.include_router(reading_interest_router)
     application.include_router(book_details_router)
     application.include_router(courses_router)
     application.include_router(profile_router)

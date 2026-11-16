@@ -24,6 +24,7 @@ from app.db.models.operations import (
     Reservation,
     SystemSetting,
 )
+from app.db.models.reading_interest import ReadingInterest, ReadingInterestEvent
 from app.db.models.recommendation import (
     BookUserState,
     LearningPath,
@@ -35,6 +36,8 @@ from app.db.models.recommendation import (
 )
 
 __all__ = [
+    "ReadingInterest",
+    "ReadingInterestEvent",
     "Book",
     "BookTag",
     "BookUserState",

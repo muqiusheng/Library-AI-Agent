@@ -4,6 +4,8 @@ from app.db.base import Base
 from app.db.models import User
 
 EXPECTED_TABLES = {
+    "reading_interests",
+    "reading_interest_events",
     "book_tags",
     "book_user_states",
     "books",

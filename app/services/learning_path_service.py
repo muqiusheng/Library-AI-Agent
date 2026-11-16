@@ -7,13 +7,15 @@ from sqlalchemy.orm import Session, selectinload
 from app.core.errors import AppError
 from app.db.models import (
     Book,
+    BookUserState,
     BookUserStateValue,
     LearningPath,
     LearningPathBook,
     LearningPathStage,
     LearningPathStatus,
-    RecommendationSet,
     ProfileMemory,
+    RecommendationSet,
+    User,
 )
 from app.db.models.enums import MemorySource
 from app.schemas.learning_path import (
@@ -22,6 +24,7 @@ from app.schemas.learning_path import (
     PathBookRead,
     PathStageRead,
 )
+from app.services.reading_progress import recalculate_path, set_reading_progress
 
 _STAGES = (
     ("基础入门", "建立核心概念和必要基础", "1–2 周", "完成本阶段图书的核心章节"),
@@ -37,6 +40,7 @@ class LearningPathService:
     def create_from_recommendation(
         self, user_id: UUID, set_id: UUID, title: str | None
     ) -> LearningPathRead:
+        self.session.execute(select(User.id).where(User.id == user_id).with_for_update())
         recommendation = self.session.scalar(
             select(RecommendationSet)
             .where(RecommendationSet.id == set_id, RecommendationSet.user_id == user_id)
@@ -47,6 +51,14 @@ class LearningPathService:
                 status_code=404, code="RECOMMENDATION_NOT_FOUND", message="推荐结果不存在"
             )
         ordered_items = sorted(recommendation.items, key=lambda item: item.rank)
+        progress_by_book = dict(
+            self.session.execute(
+                select(BookUserState.book_id, BookUserState.state).where(
+                    BookUserState.user_id == user_id,
+                    BookUserState.book_id.in_([item.book_id for item in ordered_items]),
+                )
+            ).all()
+        )
         path = LearningPath(
             user_id=user_id,
             conversation_id=recommendation.conversation_id,
@@ -78,10 +90,13 @@ class LearningPathService:
                         stage_id=stage.id,
                         book_id=item.book_id,
                         position=book_position,
-                        state=BookUserStateValue.WANT_TO_READ,
+                        state=progress_by_book.get(item.book_id, BookUserStateValue.NOT_STARTED),
                     )
                 )
             start += size
+        self.session.flush()
+        self.session.refresh(path, ["stages"])
+        recalculate_path(path)
         self.session.commit()
         return self.get_owned(path.id, user_id)
 
@@ -120,9 +135,7 @@ class LearningPathService:
             )
         book_ids = [book.book_id for stage in path.stages for book in stage.books]
         titles = dict(
-            self.session.execute(
-                select(Book.id, Book.title).where(Book.id.in_(book_ids))
-            ).all()
+            self.session.execute(select(Book.id, Book.title).where(Book.id.in_(book_ids))).all()
         )
         return LearningPathRead(
             id=path.id,
@@ -164,7 +177,9 @@ class LearningPathService:
         if status == LearningPathStatus.COMPLETED:
             for stage in path.stages:
                 for book in stage.books:
-                    book.state = BookUserStateValue.COMPLETED
+                    set_reading_progress(
+                        self.session, user_id, book.book_id, BookUserStateValue.COMPLETED
+                    )
             path.progress = Decimal("100.00")
         self.session.commit()
         return self.get_owned(path_id, user_id)
@@ -182,14 +197,7 @@ class LearningPathService:
         ]
         if not matching:
             raise AppError(status_code=404, code="PATH_BOOK_NOT_FOUND", message="路径图书不存在")
-        matching[0].state = state
-        books = [book for stage in path.stages for book in stage.books]
-        completed = sum(book.state == BookUserStateValue.COMPLETED for book in books)
-        path.progress = Decimal(str(round(completed * 100 / len(books), 2)))
-        if completed == len(books):
-            path.status = LearningPathStatus.COMPLETED
-        elif path.status in {LearningPathStatus.DRAFT, LearningPathStatus.COMPLETED}:
-            path.status = LearningPathStatus.ACTIVE
+        set_reading_progress(self.session, user_id, book_id, state)
         self.session.commit()
         return self.get_owned(path_id, user_id)
 
@@ -199,18 +207,8 @@ class LearningPathService:
         if not target_stage:
             raise AppError(status_code=404, code="PATH_STAGE_NOT_FOUND", message="路径阶段不存在")
 
-        # Mark all books in the stage as completed
         for book in target_stage.books:
-            book.state = BookUserStateValue.COMPLETED
-
-        # Recalculate progress
-        books = [book for stage in path.stages for book in stage.books]
-        completed = sum(book.state == BookUserStateValue.COMPLETED for book in books)
-        path.progress = Decimal(str(round(completed * 100 / len(books), 2)))
-        if completed == len(books):
-            path.status = LearningPathStatus.COMPLETED
-        elif path.status == LearningPathStatus.DRAFT:
-            path.status = LearningPathStatus.ACTIVE
+            set_reading_progress(self.session, user_id, book.book_id, BookUserStateValue.COMPLETED)
 
         # Sync to user profile memory
         # Disable previous active memory for this key if exists
@@ -221,7 +219,7 @@ class LearningPathService:
                 ProfileMemory.user_id == user_id,
                 ProfileMemory.category == category,
                 ProfileMemory.key == key,
-                ProfileMemory.is_active.is_(True)
+                ProfileMemory.is_active.is_(True),
             )
         )
         if existing:
@@ -231,7 +229,11 @@ class LearningPathService:
             user_id=user_id,
             category=category,
             key=key,
-            value_json={"stage": target_stage.title, "path": path.title, "objective": target_stage.objective},
+            value_json={
+                "stage": target_stage.title,
+                "path": path.title,
+                "objective": target_stage.objective,
+            },
             source=MemorySource.MANUAL,
             source_message_id=None,
             confidence=1.0,

@@ -53,7 +53,7 @@ class ReviewStatus(StrEnum):
 
 
 class BookUserStateValue(StrEnum):
-    WANT_TO_READ = "want_to_read"
+    NOT_STARTED = "not_started"
     READING = "reading"
     COMPLETED = "completed"
 

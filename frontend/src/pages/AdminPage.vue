@@ -67,7 +67,8 @@
       </header>
 
       <div class="p-4 sm:p-6">
-        <section v-if="section === 'dashboard'" class="space-y-6">
+        <InterestBookList v-if="section === 'popular'" admin />
+      <section v-else-if="section === 'dashboard'" class="space-y-6">
           <div
             class="rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 p-6 text-white shadow-sm"
           >
@@ -816,6 +817,7 @@
 </template>
 
 <script setup lang="ts">
+import InterestBookList from "@/components/recommendation/InterestBookList.vue";
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { useRouter } from "vue-router";
 
@@ -857,6 +859,7 @@ import {
 import { getApiErrorMessage } from "@/utils/apiError";
 
 type Section =
+  | "popular"
   | "dashboard"
   | "imports"
   | "tags"
@@ -887,6 +890,7 @@ const resetUserId = ref<string | null>(null);
 const resetPasswordValue = ref("");
 let timer: number | undefined;
 const navigation: { id: Section; label: string; icon: string }[] = [
+  { id: "popular", label: "热门想读榜", icon: "♡" },
   { id: "dashboard", label: "控制台", icon: "▦" },
   { id: "imports", label: "馆藏数据管理", icon: "⇧" },
   { id: "tags", label: "AI 标签审核", icon: "✓" },

@@ -56,12 +56,9 @@ class EngagementService:
         *,
         commit: bool = True,
     ) -> BookUserState:
-        value = self.session.get(BookUserState, (user_id, book_id))
-        if value is None:
-            value = BookUserState(user_id=user_id, book_id=book_id, state=state)
-            self.session.add(value)
-        else:
-            value.state = state
+        from app.services.reading_progress import set_reading_progress
+
+        value = set_reading_progress(self.session, user_id, book_id, state)
         if commit:
             self.session.commit()
         return value

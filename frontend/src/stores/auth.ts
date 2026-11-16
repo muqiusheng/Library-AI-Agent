@@ -4,6 +4,7 @@ import { computed, ref } from 'vue'
 import * as authApi from '@/api/auth'
 import type { LoginPayload, RegisterPayload, UserSummary } from '@/types/auth'
 import { getApiErrorMessage } from '@/utils/apiError'
+import { useReadingInterestStore } from '@/stores/readingInterest'
 import { useProfileStore } from '@/stores/profile'
 import { useConversationStore } from '@/stores/conversation'
 
@@ -28,6 +29,7 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = null
     user.value = null
     localStorage.removeItem(TOKEN_KEY)
+    useReadingInterestStore().clear()
     useProfileStore().clear()
     useConversationStore().clear()
   }

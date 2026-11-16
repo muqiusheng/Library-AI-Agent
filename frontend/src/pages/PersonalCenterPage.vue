@@ -13,6 +13,8 @@
       </div>
       
       <nav class="mt-8 flex-1 space-y-2 text-sm">
+        <RouterLink class="block rounded-xl px-4 py-3 text-white/60 hover:bg-white/5" active-class="!bg-white/15 !text-white font-medium" to="/personal-center/wanted">我的想读</RouterLink>
+        <RouterLink class="block rounded-xl px-4 py-3 text-white/60 hover:bg-white/5" active-class="!bg-white/15 !text-white font-medium" to="/personal-center/popular">热门想读榜</RouterLink>
         <RouterLink class="block rounded-xl px-4 py-3 text-white/60 hover:bg-white/5" active-class="!bg-white/15 !text-white font-medium" to="/personal-center/basic">
           基本信息
         </RouterLink>

@@ -10,6 +10,7 @@ from app.db.models import User
 from app.db.session import get_db
 from app.integrations.library.local import LocalLibraryAdapter
 from app.schemas.common import ApiResponse, success_response
+from app.services.reading_interest_service import ReadingInterestService
 
 router = APIRouter(prefix="/api/v1/books", tags=["books"])
 
@@ -18,7 +19,7 @@ router = APIRouter(prefix="/api/v1/books", tags=["books"])
 def get_book_detail(
     book_id: UUID,
     request: Request,
-    _: Annotated[User, Depends(get_current_user)],
+    user: Annotated[User, Depends(get_current_user)],
     session: Annotated[Session, Depends(get_db)],
 ) -> dict:
     book = LocalLibraryAdapter(session).get_book(book_id)
@@ -46,4 +47,9 @@ def get_book_detail(
             for holding in book.holdings
         ],
     }
+    data.update(ReadingInterestService(session).statuses(user.id, [book_id])[0])
+    data["holdings_count"] = len(book.holdings)
+    data["available_count"] = sum(
+        h.book_status == "available" and h.circulation_status == "lendable" for h in book.holdings
+    )
     return success_response(request.state.request_id, data)

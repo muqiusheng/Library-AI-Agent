@@ -37,6 +37,7 @@ const router = createRouter({
       component: () => import('@/pages/WorkspacePage.vue'),
       meta: { requiresAuth: true }
     },
+    { path: '/popular', name: 'popular', redirect: '/personal-center/popular' },
     {
       path: '/personal-center',
       component: () => import('@/pages/PersonalCenterPage.vue'),
@@ -46,6 +47,8 @@ const router = createRouter({
         { path: 'basic', name: 'personal-basic', component: () => import('@/components/Profile/BasicInfoEditor.vue') },
         { path: 'profile', name: 'personal-profile', component: () => import('@/components/Profile/ProfileEditor.vue') },
         { path: 'paths/:id?', name: 'personal-paths', component: () => import('@/components/Profile/LearningPaths.vue') },
+        { path: 'wanted', name: 'personal-wanted', component: () => import('@/components/recommendation/InterestBookList.vue'), props: { mine: true } },
+        { path: 'popular', name: 'personal-popular', component: () => import('@/pages/PopularBooksPage.vue') },
         { path: 'theme', name: 'personal-theme', component: () => import('@/components/Profile/ThemeEditor.vue') }
       ]
     },

@@ -1,7 +1,7 @@
 import { apiClient } from '@/api/client'
 
 export type FeedbackType = 'like' | 'not_interested' | 'too_hard' | 'too_easy' | 'read'
-export type BookState = 'want_to_read' | 'reading' | 'completed'
+export type BookState = 'not_started' | 'reading' | 'completed'
 
 export async function sendFeedback(
   setId: string,
