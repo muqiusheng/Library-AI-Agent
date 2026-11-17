@@ -27,6 +27,7 @@ constraints 只填写用户本轮明确变更的字段，不要复制旧值；�
 不要把帮朋友找书或本次条件写成长期画像。explain 和 availability 不重新推荐。
 澄清回复应结合 pending_question 理解。普通知识问答不要转成荐书。
 澄清每轮只问最关键的一两个问题；历史中已明确的学习基础与目标不重复询问。
+用户补充或修正用途、基础、内容偏好时 need_changed=true；仅换书、调整难度或筛选条件时为 false。
 """
 
 
@@ -137,7 +138,9 @@ class ConversationTurnService:
     @staticmethod
     def fallback(context: ConversationContext, text: str) -> TurnResolution:
         if text.strip() in _STARTER_QUESTIONS:
-            return TurnResolution(action="clarify", new_topic=True, clarification=_STARTER_QUESTIONS[text.strip()])
+            return TurnResolution(
+                action="clarify", new_topic=True, clarification=_STARTER_QUESTIONS[text.strip()],
+            )
         action = "chat"
         rank = ConversationTurnService.rank(text)
         named_book = bool(
@@ -174,6 +177,10 @@ class ConversationTurnService:
             and context.task.request
         ):
             action = "refine"
+        elif context.task.request and any(
+            word in text for word in ("用于", "用来", "改为", "偏案例", "偏理论", "我会", "学过")
+        ):
+            action = "refine"
         elif any(word in text for word in ("推荐", "找书", "图书", "教材", "我想学")):
             action = "recommend"
         topics = re.findall(
@@ -206,6 +213,10 @@ class ConversationTurnService:
             action=action,
             topic=topic,
             new_topic=new_topic,
+            need_changed=action == "refine" and any(
+                word in text for word in ("用于", "用来", "论文", "项目", "练习", "案例",
+                                          "理论", "我会", "学过")
+            ),
             target_rank=rank,
             keep_constraints="其他要求不变" in text,
             standalone_query=request,
@@ -241,6 +252,10 @@ class ConversationTurnService:
                 setattr(context.constraints, field, value)
         if "取消限制" in text or "取消所有限制" in text:
             context.task.excluded_book_ids = []
+        if result.constraints.only_available is False:
+            context.task.request = re.sub(
+                r"只看可借|仅在馆可借|必须可借", "", context.task.request,
+            )
         if any(word in text for word in ("取消", "不限", "不必只看可借")):
             context.task.request = re.sub(
                 r"只看可借|仅在馆可借|必须可借|简单一点|零基础|入门|进阶|不要[A-Za-z+#.]+",

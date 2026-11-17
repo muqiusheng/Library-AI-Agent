@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, model_validator
 
 from app.db.models.enums import MessageRole, MessageType
 
@@ -44,20 +44,33 @@ class MessageCreate(BaseModel):
 
 
 NeedField = Literal[
+    "topic",
+    "learning_goal",
     "foundation",
     "basics_preference",
     "language_preference",
     "content_preference",
 ]
 
+NeedScenario = Literal["general", "learning", "exam", "research", "interest"]
+NeedStatus = Literal["unset", "confirmed", "any", "unknown", "skipped", "not_applicable"]
+NEED_FIELDS: tuple[NeedField, ...] = (
+    "topic", "learning_goal", "foundation", "basics_preference",
+    "language_preference", "content_preference",
+)
+PREFERENCE_FIELDS: tuple[NeedField, ...] = (
+    "basics_preference", "language_preference", "content_preference",
+)
+
 
 class LearningNeedState(BaseModel):
+    scenario: NeedScenario = "general"
+    field_status: dict[NeedField, NeedStatus] = Field(default_factory=dict)
     topic: str | None = Field(default=None, max_length=4000)
     foundation: str | None = Field(default=None, max_length=1000)
     learning_goal: str | None = Field(
-    default=None,
-    max_length=2000,
-)
+        default=None, max_length=2000,
+    )
     basics_preference: Literal[
         "first", "skip", "any"
     ] | None = None
@@ -74,6 +87,25 @@ class LearningNeedState(BaseModel):
     asked_fields: list[NeedField] = Field(default_factory=list)
 
     clarification_rounds: int = Field(default=0, ge=0, le=2)
+
+    @model_validator(mode="after")
+    def normalize_status(self) -> "LearningNeedState":
+        # Old JSON states acquire statuses without changing their stored answers.
+        for field in NEED_FIELDS:
+            value = getattr(self, field)
+            status = self.field_status.get(field, "unset")
+            if value == "any" and field in PREFERENCE_FIELDS:
+                status = "any"
+            elif value == "not_applicable" and field == "language_preference":
+                status = "not_applicable"
+            elif value:
+                status = "confirmed"
+            elif status in {"confirmed", "any"} or (
+                status == "not_applicable" and field in {"topic", "foundation"}
+            ):
+                status = "unset"
+            self.field_status[field] = status
+        return self
 
 
 class ConstraintUpdate(BaseModel):
@@ -121,6 +153,7 @@ class RecommendationRetry(BaseModel):
 
 
 class ConversationTask(BaseModel):
+    pending_relaxation: ConstraintUpdate | None = None
     pending_profile_updates: list[dict[str, Any]] = Field(
         default_factory=list
     )
@@ -130,6 +163,11 @@ class ConversationTask(BaseModel):
     pending_question: str = ""
     excluded_book_ids: list[UUID] = Field(default_factory=list)
     focused_book_id: UUID | None = None
+
+    @field_serializer("pending_relaxation")
+    def serialize_relaxation(self, value: ConstraintUpdate | None) -> dict | None:
+        # Persist the proposed patch, not defaults that could clear unrelated conditions.
+        return value.model_dump(exclude_unset=True) if value is not None else None
 
 
 class TurnResolution(BaseModel):
@@ -144,6 +182,7 @@ class TurnResolution(BaseModel):
     topic: str = ""
     standalone_query: str = ""
     new_topic: bool = False
+    need_changed: bool = False
     keep_constraints: bool = False
     target_rank: int | None = Field(default=None, ge=1)
     clarification: str = ""

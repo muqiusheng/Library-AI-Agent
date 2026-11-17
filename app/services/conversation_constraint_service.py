@@ -52,7 +52,7 @@ class ConversationConstraintService:
         for field in payload.model_fields_set:
             value = getattr(payload, field)
 
-            if value is not None:
+            if value is not None or field == "difficulty":
                 current[field] = value
 
         self._assign(conversation, current)
@@ -121,8 +121,12 @@ class ConversationConstraintService:
         elif only_available is not None:
             changes["only_available"] = only_available
 
-        # 更新难度偏好。
-        if any(
+        # Explicitly cleared conditions must not survive in either state or query.
+        if "取消限制" in text or "取消所有限制" in text:
+            changes.update(difficulty=None, only_available=False, excluded_terms=[])
+        elif "取消难度" in text or "不限难度" in text:
+            changes["difficulty"] = None
+        elif any(
             phrase in text
             for phrase in (
                 "简单一点",

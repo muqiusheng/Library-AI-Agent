@@ -45,8 +45,11 @@ from app.services.effective_profile_service import (
 )
 from app.services.general_chat_service import GeneralChatService
 from app.services.need_clarification_service import (
+    CANCEL_REQUESTS,
+    DIRECT_REQUESTS,
     NeedClarificationService,
 )
+from app.services.need_policy_service import NeedPolicyService
 from app.services.profile_memory_service import ProfileMemoryService
 from app.services.recommendation_progress import RecommendationProgress
 from app.services.recommendation_run_service import (
@@ -407,7 +410,30 @@ async def stream_message(
                 conversation
             )
 
-            if waiting_for_answer:
+            pending_relaxation = context.task.pending_relaxation
+            relaxation_accepted = bool(
+                pending_relaxation
+                and confirmation in {"好", "好的", "可以", "是", "同意", "取消吧"}
+            )
+            context.task.pending_relaxation = None
+            if confirmation in CANCEL_REQUESTS | DIRECT_REQUESTS:
+                resolution = TurnResolution(
+                    action="recommend", topic=context.task.topic,
+                    standalone_query=context.task.request,
+                )
+            elif relaxation_accepted:
+                resolution = TurnResolution(
+                    action="refine", topic=context.task.topic,
+                    standalone_query=context.task.request,
+                    constraints=pending_relaxation,
+                )
+            elif pending_relaxation and confirmation in {"不", "不要", "不行", "保留", "保留限制"}:
+                resolution = TurnResolution(
+                    action="clarify", clarification=(
+                        "好的，保留现有条件。你可以补充用途，或说明其他想调整的条件。"
+                    ),
+                )
+            elif waiting_for_answer:
                 need = constraints_service.get(
                     conversation
                 ).learning_need
@@ -446,7 +472,10 @@ async def stream_message(
                     constraints_service.update_from_message(
                         conversation,
                         text,
-                        only_available=payload.only_available,
+                        only_available=(
+                            pending_relaxation.only_available
+                            if relaxation_accepted else payload.only_available
+                        ),
                     )
                 )
 
@@ -583,10 +612,12 @@ async def stream_message(
 
             # 首次或新主题推荐时澄清需求。
             # 已有书单的单纯换书操作不重新盘问用户。
+            next_action = NeedPolicyService().decide(
+                context.constraints.learning_need,
+                refine=resolution.action == "refine" and context.recommendation is not None,
+            )
             needs_clarification = (
-                waiting_for_answer
-                or resolution.action == "recommend"
-                or context.recommendation is None
+                waiting_for_answer or next_action.action != "refine" or resolution.need_changed
             )
 
             if needs_clarification:
@@ -594,6 +625,7 @@ async def stream_message(
                     conversation=conversation,
                     user=current_user,
                     text=text,
+                    refine=next_action.action == "refine",
                 )
 
                 # process() 会保存状态，重新读取防止
@@ -602,13 +634,22 @@ async def stream_message(
                     constraints_service.get(conversation)
                 )
 
+                if result.new_topic and not resolution.new_topic:
+                    need = context.constraints.learning_need
+                    if "其他要求不变" not in text:
+                        context.constraints = ConstraintRead(learning_need=need)
+                    context.task = ConversationTask(topic=need.topic or "", request=result.query)
+                    contexts.save(conversation, context, commit=False)
+                    context.constraints = constraints_service.update_from_message(
+                        conversation, text, only_available=payload.only_available,
+                    )
+
                 if result.question:
                     context.task.pending_question = (
                         result.question
                     )
 
-                    # 当前澄清服务用空 query 表示取消选书。
-                    if not result.query:
+                    if result.action == "cancel":
                         context.task = ConversationTask()
 
                     contexts.save(conversation, context)

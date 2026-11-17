@@ -1,4 +1,5 @@
 import json
+import re
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 from uuid import uuid4
@@ -28,6 +29,7 @@ from app.schemas.conversation import ConstraintUpdate, MessageCreate, TurnResolu
 from app.services.conversation_constraint_service import ConversationConstraintService
 from app.services.conversation_context_service import ConversationContextService
 from app.services.conversation_turn_service import ConversationTurnService
+from app.services.need_clarification_service import NeedExtraction
 
 
 class OfflineProvider:
@@ -60,6 +62,15 @@ def memory_session(monkeypatch):
         "recommendation_service",
     ):
         monkeypatch.setattr(f"app.services.{module}.DeepSeekProvider", OfflineProvider)
+
+    async def extract_need(self, conversation, user, state, text):
+        # These tests exercise memory/replacement, not the external extraction model.
+        topic = re.search(r"Java|Python|人工智能|Agent", text, re.IGNORECASE)
+        return NeedExtraction(action="recommend", topic=topic.group() if topic else None)
+
+    monkeypatch.setattr(
+        "app.services.need_clarification_service.NeedClarificationService._extract", extract_need,
+    )
     monkeypatch.setattr(
         "app.integrations.library.local.ChromaVectorStore",
         lambda *args: SimpleNamespace(query=lambda **kwargs: []),

@@ -11,8 +11,11 @@ from sqlalchemy import select
 
 from app.core.errors import AppError
 from app.db.models import Message, MessageRole, MessageType
+from app.schemas.conversation import ConstraintRead
+from app.services.conversation_context_service import ConversationContextService
 from app.services.conversation_service import ConversationService
 from app.services.effective_profile_service import EffectiveProfileService
+from app.services.need_policy_service import NeedPolicyService
 from app.services.recommendation_progress import (
     RecommendationProgress,
     exclude_profile_facts,
@@ -216,6 +219,30 @@ class RecommendationRunService:
                             recommendation = data
             if recommendation is None:
                 raise RuntimeError("Recommendation result missing")
+            conditions = ConstraintRead.model_validate({
+                "only_available": parameters.get("only_available", False),
+                **parameters.get("constraints", {}),
+            })
+            decision = NeedPolicyService.after_recommendation(
+                conditions,
+                self.progress.extra.get("filter_stats", {}),
+                has_items=bool(recommendation.items),
+            )
+            if decision.action == "relax":
+                contexts = ConversationContextService(self.session)
+                context = contexts.build(self.conversation, self.user)
+                # Retrying an older result must not attach its proposal to a newer task.
+                same_task = context.task.request and context.task.request in parameters["query"]
+                same_conditions = context.constraints.model_dump(exclude={"learning_need"}) == (
+                    conditions.model_dump(exclude={"learning_need"})
+                )
+                if same_task and same_conditions:
+                    context.task.pending_relaxation = decision.suggested_changes
+                    context.task.pending_question = (
+                        decision.question if decision.suggested_changes else ""
+                    )
+                    contexts.save(self.conversation, context)
+                recommendation.summary = decision.question
             self.progress.update({"retry_stages": self._stages()})
             yield "recommendation_ready", recommendation.model_dump(mode="json")
             yield "analysis", self.progress.update({"stage": "generating", "label": "正在生成推荐"})
