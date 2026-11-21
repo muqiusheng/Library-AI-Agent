@@ -42,7 +42,7 @@ const interest = useReadingInterestStore()
 const selectedFeedback = ref<FeedbackType | null>(null); const notice = ref('')
 const feedbackOptions: { type: FeedbackType; label: string }[] = [{ type: 'like', label: '喜欢' }, { type: 'not_interested', label: '不感兴趣' }, { type: 'too_hard', label: '太难' }, { type: 'too_easy', label: '太简单' }]
 const coverText = computed(() => props.book.topics[0] || '馆藏图书')
-const difficultyLabel = computed(() => ({ beginner: '入门', intermediate: '中阶', advanced: '进阶' }[props.book.difficulty] || props.book.difficulty))
+const difficultyLabel = computed(() => ({ beginner: '入门', intermediate: '中阶', advanced: '进阶', unknown: '未标注' }[props.book.difficulty] || props.book.difficulty))
 
 async function feedback(type: FeedbackType) {
   if (selectedFeedback.value === type) {

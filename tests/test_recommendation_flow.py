@@ -172,7 +172,9 @@ def test_feedback_state_and_conversation_constraints_affect_next_round(
     constraints = client.get(
         f"/api/v1/conversations/{conversation_id}/constraints", headers=headers
     )
-    assert constraints.json()["data"] == {
+    state = constraints.json()["data"]
+    assert state["learning_need"]["topic"].casefold() == "java"
+    assert {key: value for key, value in state.items() if key != "learning_need"} == {
         "only_available": True,
         "difficulty": "beginner",
         "excluded_terms": [],

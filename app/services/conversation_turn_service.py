@@ -27,6 +27,7 @@ constraints 只填写用户本轮明确变更的字段，不要复制旧值；�
 不要把帮朋友找书或本次条件写成长期画像。explain 和 availability 不重新推荐。
 澄清回复应结合 pending_question 理解。普通知识问答不要转成荐书。
 澄清每轮只问最关键的一两个问题；历史中已明确的学习基础与目标不重复询问。
+用户撤销或更换偏好（如“可以不用 pandas”）属于 refine。
 用户补充或修正用途、基础、内容偏好时 need_changed=true；仅换书、调整难度或筛选条件时为 false。
 """
 
@@ -136,6 +137,27 @@ class ConversationTurnService:
         return int(value) if value.isdigit() else "一二三四五六七八九十".index(value) + 1
 
     @staticmethod
+    def explicit_topic(text: str) -> str:
+        quoted = re.search(r"《([^》]+)》", text)
+        if quoted:
+            return quoted[1]
+        positive = re.sub(r"(?:排除|不要|不想看|最好)[^，；。]+", "", text)
+        # Background in a preceding clause is not the requested subject.
+        clauses = re.split(r"[，,；;。]", positive)
+        requests = [
+            part for part in clauses if re.search(r"想学|想找|推荐|找一本|学习路线|拓展阅读", part)
+        ]
+        positive = " ".join(requests) if requests else positive
+        positive = re.sub(r"(?:我(?:已|有|会|学过)|已有)[^，；。]*?基础", "", positive)
+        topics = re.findall(
+            r"javascript|java|python|langchain|agent|数据分析|数据库|算法|机器学习|人工智能|"
+            r"考研数学|操作系统|计算机网络",
+            positive,
+            re.IGNORECASE,
+        )
+        return topics[0] if len({topic.casefold() for topic in topics}) == 1 else ""
+
+    @staticmethod
     def fallback(context: ConversationContext, text: str) -> TurnResolution:
         if text.strip() in _STARTER_QUESTIONS:
             return TurnResolution(
@@ -178,17 +200,36 @@ class ConversationTurnService:
         ):
             action = "refine"
         elif context.task.request and any(
-            word in text for word in ("用于", "用来", "改为", "偏案例", "偏理论", "我会", "学过")
+            word in text
+            for word in (
+                "用于",
+                "用来",
+                "改为",
+                "偏案例",
+                "偏理论",
+                "我会",
+                "学过",
+                "可以不用",
+                "最好",
+            )
         ):
             action = "refine"
-        elif any(word in text for word in ("推荐", "找书", "图书", "教材", "我想学")):
+        elif any(
+            word in text
+            for word in (
+                "推荐",
+                "找书",
+                "图书",
+                "教材",
+                "我想学",
+                "找一本",
+                "可借的书",
+                "学习路线",
+                "拓展阅读",
+            )
+        ):
             action = "recommend"
-        topics = re.findall(
-            r"java|python|langchain|agent|数据库|算法|机器学习|人工智能|考研数学|操作系统|计算机网络",
-            text,
-            re.IGNORECASE,
-        )
-        topic = topics[0] if topics else ""
+        topic = ConversationTurnService.explicit_topic(text)
         new_topic = bool(
             topic and context.task.topic and topic.casefold() not in context.task.topic.casefold()
         )
@@ -215,7 +256,7 @@ class ConversationTurnService:
             new_topic=new_topic,
             need_changed=action == "refine" and any(
                 word in text for word in ("用于", "用来", "论文", "项目", "练习", "案例",
-                                          "理论", "我会", "学过")
+                                          "理论", "我会", "学过", "可以不用", "最好")
             ),
             target_rank=rank,
             keep_constraints="其他要求不变" in text,

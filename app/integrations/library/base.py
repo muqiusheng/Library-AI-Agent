@@ -9,6 +9,13 @@ class LibraryPort(Protocol):
 
     def get_books(self, ids: list[UUID]) -> list[Book]: ...
 
-    def search_candidates(self, query: str, *, limit: int = 50) -> list[Book]: ...
+    def search_candidates(
+        self,
+        query: str,
+        *,
+        limit: int = 50,
+        topic: str = "",
+        semantic_scores: dict[UUID, float] | None = None,
+    ) -> list[Book]: ...
 
     def get_book(self, book_id: UUID) -> Book | None: ...

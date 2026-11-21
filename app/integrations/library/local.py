@@ -1,7 +1,7 @@
 import re
 from uuid import UUID
 
-from sqlalchemy import desc, or_, select
+from sqlalchemy import case, func, literal, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.errors import AppError
@@ -19,7 +19,7 @@ class LocalLibraryAdapter:
         value = self.session.scalar(
             select(DataVersion.id)
             .where(DataVersion.status == DataVersionStatus.PUBLISHED)
-            .order_by(desc(DataVersion.published_at))
+            .order_by(DataVersion.published_at.desc())
             .limit(1)
         )
         if value is None:
@@ -46,45 +46,40 @@ class LocalLibraryAdapter:
         books = self.get_books([book_id])
         return books[0] if books else None
 
-    def search_candidates(self, query: str, *, limit: int = 50) -> list[Book]:
+    def search_candidates(
+        self,
+        query: str,
+        *,
+        limit: int = 50,
+        topic: str = "",
+        semantic_scores: dict[UUID, float] | None = None,
+    ) -> list[Book]:
         version_id = self.published_version_id()
-        vector_hits = self.vector_store.query(data_version_id=version_id, text=query, limit=limit)
-        vector_ids = [hit.book_id for hit in vector_hits]
-        candidates = self.get_books(vector_ids)
-        seen = {book.id for book in candidates}
+        hits = self.vector_store.query(data_version_id=version_id, text=query, limit=limit)
+        if semantic_scores is not None:
+            semantic_scores.update((hit.book_id, hit.score) for hit in hits)
 
-        tokens = self._tokens(query)
-        conditions = []
-        for token in tokens[:8]:
-            pattern = f"%{token}%"
-            conditions.extend((Book.title.ilike(pattern), Book.description.ilike(pattern)))
-        if conditions:
-            statement = (
-                select(Book)
-                .where(Book.data_version_id == version_id, or_(*conditions))
-                .options(selectinload(Book.holdings), selectinload(Book.tags))
-                .limit(limit)
-            )
-            for book in self.session.scalars(statement).unique():
-                if book.id not in seen:
-                    candidates.append(book)
-                    seen.add(book.id)
-
-        if len(candidates) < 5:
-            statement = (
-                select(Book)
-                .where(Book.data_version_id == version_id)
-                .options(selectinload(Book.holdings), selectinload(Book.tags))
-                .order_by(desc(Book.publication_year).nullslast(), Book.title)
-                .limit(20)
-            )
-            for book in self.session.scalars(statement).unique():
-                if book.id not in seen:
-                    candidates.append(book)
-                    seen.add(book.id)
-                if len(candidates) >= limit:
-                    break
-        return candidates[:limit]
+        exact_title = (topic or query).strip().casefold()
+        exact = func.lower(Book.title) == exact_title
+        tokens = self._tokens(f"{topic} {query}")[:8]
+        title_hits = [Book.title.icontains(token, autoescape=True) for token in tokens]
+        description_hits = [Book.description.icontains(token, autoescape=True) for token in tokens]
+        title_score = sum((case((hit, 1), else_=0) for hit in title_hits), literal(0))
+        statement = (
+            select(Book.id, exact.label("exact"))
+            .where(Book.data_version_id == version_id, or_(exact, *title_hits, *description_hits))
+            .order_by(exact.desc(), title_score.desc(), Book.id)
+            .limit(limit)
+        )
+        lexical = self.session.execute(statement).all()
+        # Reciprocal rank fusion gives each retrieval channel an equal vote.
+        ranks: dict[UUID, float] = {}
+        for channel in ([row.id for row in lexical], [hit.book_id for hit in hits]):
+            for rank, book_id in enumerate(channel, 1):
+                ranks[book_id] = ranks.get(book_id, 0.0) + 1 / (60 + rank)
+        exact_ids = {row.id for row in lexical if row.exact}
+        ordered = sorted(ranks, key=lambda key: (key in exact_ids, ranks[key]), reverse=True)
+        return self.get_books(ordered[:limit])
 
     @staticmethod
     def _tokens(query: str) -> list[str]:

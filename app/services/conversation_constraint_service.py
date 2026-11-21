@@ -147,12 +147,13 @@ class ConversationConstraintService:
         ):
             changes["difficulty"] = "advanced"
 
-        # 保留现有的排除关键词提取逻辑。
-        excluded = re.findall(
-            r"(?:不要|排除|不想看)"
-            r"([A-Za-z+#.]{2,20}|[\u4e00-\u9fff]{2,8})",
-            text,
+        term_pattern = r"([A-Za-z0-9+#.]{1,40}|[\u4e00-\u9fff]{2,8})"
+        title_pattern = (
+            r"(?:书名|标题)(?:里|中)?\s*(?:不要|不含|排除)(?:出现|包含|含有)?\s*" + term_pattern
         )
+        excluded = ["书名：" + term for term in re.findall(title_pattern, text)]
+        remaining_text = re.sub(title_pattern, "", text)
+        excluded.extend(re.findall(r"(?:不要|排除|不想看)\s*" + term_pattern, remaining_text))
 
         if excluded:
             current = self.get(conversation).excluded_terms

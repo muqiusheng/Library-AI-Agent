@@ -1,4 +1,5 @@
 import json
+import re
 from dataclasses import dataclass
 from typing import Literal
 
@@ -24,10 +25,12 @@ from app.schemas.conversation import (
 from app.services.conversation_constraint_service import (
     ConversationConstraintService,
 )
+from app.services.conversation_turn_service import ConversationTurnService
 from app.services.need_policy_service import NeedPolicyService
 
 
 class NeedExtraction(BaseModel):
+    preferred_terms: list[str] | None = Field(default=None, max_length=12)
     scenario: NeedScenario | None = None
     field_status: dict[NeedField, NeedStatus] = Field(default_factory=dict)
     cleared_fields: list[NeedField] = Field(default_factory=list)
@@ -256,6 +259,10 @@ class NeedClarificationService:
 
     @staticmethod
     def _merge(state: LearningNeedState, extracted: NeedExtraction) -> LearningNeedState:
+        if extracted.preferred_terms is not None:
+            state.preferred_terms = list(
+                dict.fromkeys(term.strip() for term in extracted.preferred_terms if term.strip())
+            )
         for name in NEED_FIELDS:
             value = getattr(extracted, name)
             status = extracted.field_status.get(name)
@@ -314,11 +321,31 @@ class NeedClarificationService:
         text: str,
     ) -> NeedExtraction | None:
         if not self.provider.available:
-            return None
+            # Retain pending answers when a free-form reply cannot be resolved locally.
+            # An explicit change to one soft preference keeps all other task fields.
+            removed = re.findall(r"(?:可以不用|不必包含)\s*([\w+#.-]+)", text)
+            if state.topic and removed:
+                unwanted = {term.casefold() for term in removed}
+                return NeedExtraction(
+                    action="recommend",
+                    preferred_terms=[
+                        term for term in state.preferred_terms if term.casefold() not in unwanted
+                    ],
+                )
+            topic = ConversationTurnService.explicit_topic(text)
+            if not topic or state.pending_fields:
+                return None
+            goals = re.findall(r"项目|考试|考研|练习|实践|原理|理论|案例", text)
+            preferred = re.findall(r"最好(?:用|包含)?\s*([A-Za-z][\w+#.-]*)", text)
+            return NeedExtraction(
+                preferred_terms=preferred or None,
+                topic=topic,
+                learning_goal="、".join(goals) or None,
+                action="recommend",
+                new_topic=bool(state.topic and topic.casefold() != state.topic.casefold()),
+            )
 
-        history = ConversationRepository(
-            self.session
-        ).messages(conversation.id, user.id)[-8:]
+        history = ConversationRepository(self.session).messages(conversation.id, user.id)[-8:]
 
         profile = {}
 
@@ -399,6 +426,9 @@ class NeedClarificationService:
             "用户主动询问是否可以直接推荐，"
             "不一定等于已经要求执行。"
             "\n"
+            "preferred_terms 保存最好包含的具体工具或术语，如 pandas。"
+            "补充或撤销时返回仍有效的完整列表；清空为 []，没涉及为 null。"
+            "不要把软偏好或被排除的词混入学习主题。"
             "learning_goal 保存用户的具体用途、任务、应用场景、"
             "希望解决的问题，以及明确的时间要求。"
             "例如用户说“想学数据挖掘，用于毕业论文的客户流失预测”，"
@@ -445,6 +475,9 @@ class NeedClarificationService:
             "请根据以下需求推荐真实馆藏图书。",
             f"学习主题：{state.topic}",
         ]
+
+        if state.preferred_terms:
+            lines.append("优先包含：" + "、".join(state.preferred_terms))
 
         if state.foundation:
             lines.append(

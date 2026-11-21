@@ -41,7 +41,7 @@ watch(() => props.candidates, (books) => {
 const chosen = computed(() => selected.value.map(id => props.candidates.find(book => book.book_id === id)).filter((book): book is BookComparison => Boolean(book)))
 const scoreLabels = { goal: '目标匹配', difficulty: '难度匹配', major: '专业相关', interest: '兴趣相关', semantic: '语义相关', availability: '可借情况' }
 function difficulty(value?: string | null): string {
-  return ({ beginner: '入门', intermediate: '中阶', advanced: '进阶' } as Record<string, string>)[value || ''] || value || '未标注'
+  return ({ beginner: '入门', intermediate: '中阶', advanced: '进阶', unknown: '未标注' } as Record<string, string>)[value || ''] || value || '未标注'
 }
 </script>
 

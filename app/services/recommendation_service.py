@@ -4,12 +4,14 @@ import re
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import suppress
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from time import monotonic
 from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.db.models import (
     Book,
@@ -165,6 +167,7 @@ class RecommendationService:
         on_progress: Callable[[dict], Awaitable[None]] | None = None,
         excluded_profile_keys: list[str] | None = None,
         resume_candidate_ids: list[UUID] | None = None,
+        resume_semantic_scores: dict[str, float] | None = None,
         on_checkpoint: Callable[[dict], None] | None = None,
     ) -> RecommendationSetRead:
         raw_profile = self._profile_snapshot(user)
@@ -190,14 +193,14 @@ class RecommendationService:
         top_k = int(config.get("recommendation_top_k"))
         weights = config.get("recommendation_weights")
         only_available = bool(constraint_values.get("only_available"))
-        feedback = list(
+        excluded_ids = set(
             self.session.scalars(
-                select(RecommendationFeedback).where(RecommendationFeedback.user_id == user.id)
+                select(RecommendationFeedback.book_id).where(
+                    RecommendationFeedback.user_id == user.id,
+                    RecommendationFeedback.type == FeedbackType.NOT_INTERESTED,
+                )
             )
         )
-        excluded_ids = {
-            value.book_id for value in feedback if value.type == FeedbackType.NOT_INTERESTED
-        }
         excluded_ids.update(excluded_book_ids or [])
         completed_ids = set(
             self.session.scalars(
@@ -208,30 +211,72 @@ class RecommendationService:
             )
         )
         excluded_terms = [
-            str(value).casefold() for value in constraint_values.get("excluded_terms", [])
+            str(value).strip().casefold() for value in constraint_values.get("excluded_terms", [])
+            if str(value).strip()
         ]
+        topic, search_text = self._search_need(query, constraint_values)
+        recent_ratings = self.session.execute(
+            select(RecommendationFeedback, Book)
+            .join(Book, Book.id == RecommendationFeedback.book_id)
+            .where(
+                RecommendationFeedback.user_id == user.id,
+                RecommendationFeedback.type.in_([FeedbackType.TOO_HARD, FeedbackType.TOO_EASY]),
+                RecommendationFeedback.created_at >= datetime.now(UTC) - timedelta(days=90),
+            )
+            .options(selectinload(Book.tags))
+            .order_by(RecommendationFeedback.created_at.desc())
+        )
+        terms = self._subject_terms(topic)
+        topic_feedback = {}
+        for rating, book in recent_ratings:
+            subjects = [
+                book.title.casefold(),
+                *(tag.tag_value.casefold() for tag in book.tags if tag.tag_type == "topic"),
+            ]
+            if any(term in subject for subject in subjects for term in terms):
+                topic_feedback.setdefault(book.id, rating)
         preferred = self._effective_preference(
             user,
-            feedback,
+            list(topic_feedback.values()),
             constraint_values.get("difficulty"),
             profile=profile,
-            query=query,
+            query=topic,
         )
         constraint_values["effective_difficulty"] = preferred
+        semantic_scores = {
+            UUID(key): value for key, value in (resume_semantic_scores or {}).items()
+        }
         if resume_candidate_ids is None:
             enriched_query = await self._enrich_query(
-                query,
+                search_text,
                 user,
                 profile=profile,
                 preferred_difficulty=preferred,
             )
-            candidates = self.library.search_candidates(enriched_query, limit=50)
+            started = monotonic()
+            for limit in (50, 100, 200):
+                candidates = self.library.search_candidates(
+                    enriched_query,
+                    limit=limit,
+                    topic=topic,
+                    semantic_scores=semantic_scores,
+                )
+                eligible, _ = self._filter_candidates(
+                    candidates, excluded_ids, completed_ids, excluded_terms, only_available
+                )
+                if len(eligible) >= 50 or len(candidates) < limit or monotonic() - started >= 2:
+                    break
         else:
             candidates = self.library.get_books(resume_candidate_ids)
         retrieved_count = len(candidates)
         if on_checkpoint:
             on_checkpoint(
                 {
+                    "semantic_scores": {
+                        str(b.id): semantic_scores[b.id]
+                        for b in candidates
+                        if b.id in semantic_scores
+                    },
                     "candidate_ids": [str(book.id) for book in candidates],
                     "profile_snapshot": profile,
                 }
@@ -253,39 +298,76 @@ class RecommendationService:
             "retained_from_previous": 0,
         }
         await notify(filter_stats=stats, retry_stages=["retrieving", "comparing"])
+
+        need = constraint_values.get("learning_need") or {}
+        purpose = " ".join(
+            part
+            for part in (
+                need.get("learning_goal"),
+                {"practice": "项目实践", "theory": "理论原理", "balanced": "理论实践"}.get(
+                    need.get("content_preference")
+                ),
+            )
+            if part
+        )
+        if not purpose and not need.get("topic"):
+            purpose = search_text.replace(topic, "").strip()
+
+        def score(book):
+            return self._score(
+                book,
+                topic,
+                user,
+                preferred,
+                weights,
+                profile=profile,
+                semantic=semantic_scores.get(book.id, 0.0) * 100,
+                purpose=purpose,
+                preferred_terms=need.get("preferred_terms", []),
+            )
+
         scored = sorted(
-            (
-                self._score(book, query, user, preferred, weights, profile=profile)
-                for book in candidates
-            ),
+            (score(book) for book in candidates[:50]),
             key=lambda item: item.total,
             reverse=True,
         )
-        top = scored[:10]
+        scored = [item for item in scored if item.scores.goal > 20 or item.scores.semantic >= 50]
+        exact_title = topic.strip().casefold()
+        # Preserve a direct title lookup even if the reader profile favors another book.
+        title_terms = self._subject_terms(topic)
+        scored.sort(
+            key=lambda item: (
+                item.book.title.casefold() == exact_title,
+                item.scores.semantic >= 50
+                or any(term in item.book.title.casefold() for term in title_terms),
+            ),
+            reverse=True,
+        )
+        top = self._comparison_pool(scored) if self.llm.available else scored[:10]
+        stats["compared"] = len(top)
         await notify(
             stage="comparing",
             label="正在比较适配程度" if self.llm.available else "正在计算初筛排序",
             detail=(
-                f"筛选后保留 {len(scored)} 本候选，重点比较前 {len(top)} 本。"
+                f"筛选后保留 {len(scored)} 本候选，重点比较其中 {len(top)} 本。"
                 if self.llm.available and top
                 else f"筛选后保留 {len(scored)} 本候选，按主题、难度等分项排序。"
             ),
         )
         ordered = await self._rerank(query, top, profile=profile)
+        if ordered is top:
+            ordered = scored[:10]
         final = ordered[:top_k]
         retained_ids = []
         if replacement_slots:
             retained_ids = [book_id for book_id in replacement_slots if book_id is not None]
             retained = {
-                book.id: self._score(book, query, user, preferred, weights, profile=profile)
+                book.id: score(book)
                 for book in self.library.get_books(retained_ids)
                 if book.id not in excluded_ids
                 and book.id not in completed_ids
                 and (not only_available or self._available_count(book) > 0)
-                and not any(
-                    term in f"{book.title} {book.description or ''}".casefold()
-                    for term in excluded_terms
-                )
+                and not self._excluded_content(book, excluded_terms)
             }
             alternatives = iter(item for item in ordered if item.book.id not in retained)
             final = []
@@ -295,7 +377,7 @@ class RecommendationService:
                     final.append(item)
         ranks = {item.book.id: rank for rank, item in enumerate(final, start=1)}
         ordered_ids = {item.book.id for item in ordered}
-        initial_ranks = {item.book.id: rank for rank, item in enumerate(top, start=1)}
+        initial_ranks = {item.book.id: rank for rank, item in enumerate(scored, start=1)}
         comparison_pool = {item.book.id: item for item in [*final, *top]}
         candidate_details = [
             self._comparison_record(item, ranks, ordered_ids, initial_ranks)
@@ -323,7 +405,7 @@ class RecommendationService:
             constraints_snapshot=constraint_values,
             model_name=self.llm.settings.deepseek_chat_model
             if self.llm.available
-            else "deterministic-v1",
+            else "deterministic-v2",
         )
         self.session.add(recommendation_set)
         self.session.flush()
@@ -369,6 +451,75 @@ class RecommendationService:
             items=cards,
         )
 
+    @staticmethod
+    def _search_need(query: str, constraints: dict) -> tuple[str, str]:
+        need = constraints.get("learning_need") or {}
+        positive = re.split(r"[；\n](?:难度[：要]|仅在馆|只推荐在馆|排除)", query)[0]
+        positive = re.sub(r"(?:书名[里中]?)?(?:不要|排除|不想看)[^，。；\n]+", " ", positive)
+        positive = re.sub(r"(?:只看|只推荐|仅看|必须|仅)(?:在馆)?可借(?:的书)?", " ", positive)
+        positive = positive.strip(" ，,；。")
+        topic = (need.get("topic") or positive.split("；学习需求：")[0]).strip()
+        for term in constraints.get("excluded_terms", []):
+            token = re.escape(term.removeprefix("书名："))
+            topic = re.sub(rf"(?:不要|排除|不想看)\s*{token}", "", topic, flags=re.I)
+        topic = topic.strip(" ，,；。")
+        quoted = re.search(r"《([^》]+)》", topic)
+        topic = re.sub(
+            r"^(?:请|帮我|给我|我想|想找|推荐|找一本|几本|一本|一些|关于|找)+", "", topic
+        )
+        topic = re.sub(r"(?:的?(?:图书|书籍|书))?[。？?！!]*$", "", topic).strip() or positive
+        if quoted:
+            topic = quoted[1]
+        if not need.get("topic"):
+            return topic, positive.strip()
+        parts = [topic, need.get("learning_goal"), *(need.get("preferred_terms") or [])]
+        if need.get("language_preference") == "python":
+            parts.append("Python 示例")
+        content = {"theory": "理论 原理", "practice": "项目 实践 案例", "balanced": "理论 实践"}
+        parts.append(content.get(need.get("content_preference")))
+        return topic, " ".join(part for part in parts if part)
+
+    @staticmethod
+    def _excluded_content(book: Book, terms: list[str]) -> bool:
+        title = book.title.casefold()
+        topics = [
+            tag.tag_value.casefold()
+            for tag in getattr(book, "tags", [])
+            if tag.tag_type in {"topic", "language"}
+        ]
+        description = (book.description or "").casefold()
+        for term in terms:
+            if term.startswith("书名："):
+                if term.removeprefix("书名：") in title:
+                    return True
+                continue
+            subject = re.escape(term)
+            if term.isascii() and term[-1:].isalnum():
+                subject += r"(?![a-z0-9])"
+            if re.search(subject, title) or term in topics:
+                return True
+            # Only affirmative descriptions of the main subject justify a hard exclusion.
+            if re.search(
+                rf"(?<!不)(?<!非)(?:主要(?:介绍|讲解)|专注于|以)\s*{subject}\s*"
+                rf"(?:为主|为核心|语言|编程|开发|[，。；]|$)",
+                description,
+            ):
+                return True
+        return False
+
+    @staticmethod
+    def _comparison_pool(scored: list[ScoredBook]) -> list[ScoredBook]:
+        if len(scored) <= 10:
+            return scored
+        pool = scored[:8]
+        for dimension in ("semantic", "goal"):
+            best = max(
+                (item for item in scored if item not in pool),
+                key=lambda item: getattr(item.scores, dimension),
+            )
+            pool.append(best)
+        return [item for item in scored if item in pool]
+
     def _filter_candidates(
         self,
         candidates: list[Book],
@@ -390,12 +541,7 @@ class RecommendationService:
                 "terms",
                 "排除关键词",
                 bool(excluded_terms),
-                lambda b: (
-                    not any(
-                        term in f"{b.title} {b.description or ''}".casefold()
-                        for term in excluded_terms
-                    )
-                ),
+                lambda b: not self._excluded_content(b, excluded_terms),
             ),
             (
                 "availability",
@@ -441,7 +587,7 @@ class RecommendationService:
             "available_count": self._available_count(book),
             "scores": item.scores.model_dump(),
             "topics": [tag.tag_value for tag in book.tags if tag.tag_type == "topic"],
-            "difficulty": tags.get("difficulty"),
+            "difficulty": self._book_difficulty(book, tags),
         }
 
     async def _enrich_query(
@@ -546,26 +692,38 @@ class RecommendationService:
         weights: dict[str, float] | None = None,
         *,
         profile: dict | None = None,
+        semantic: float = 0.0,
+        purpose: str = "",
+        preferred_terms: list[str] | None = None,
     ) -> ScoredBook:
         profile = profile if profile is not None else self._profile_snapshot(user)
         tags = {tag.tag_type: tag.tag_value for tag in book.tags}
         topics = [tag.tag_value for tag in book.tags if tag.tag_type == "topic"]
         haystack = " ".join([book.title, book.description or "", *topics]).casefold()
-        terms = self._terms(query)
+        terms = self._subject_terms(query)
         matched = sum(1 for term in terms if term in haystack)
+        if query.strip().casefold() == book.title.casefold():
+            matched = max(1, len(terms))
         goal = min(100.0, 45.0 + 55.0 * matched / max(1, len(terms))) if matched else 20.0
-        goals = " ".join(profile.get("learning_goals", []))
-        goal_terms = self._terms(goals)
+        goals = purpose or " ".join(profile.get("learning_goals", []))
+        goal_terms = self._terms(re.sub(r"用于|完成|我想|希望|学习目标|研究", " ", goals))
         goal_terms.extend(
             word
-            for word in ("项目", "实践", "练习", "考研", "考试", "原理", "理论")
+            for word in ("项目", "实践", "案例", "练习", "考研", "考试", "原理", "理论")
             if word in goals
         )
+        if purpose and any(word in goals for word in ("项目", "实践", "案例", "练习")):
+            goal_terms.extend(("案例", "实战", "从零实现", "动手"))
         if matched and goal_terms:
             aligned = any(term in haystack for term in goal_terms)
             goal = 0.85 * goal + 0.15 * (100.0 if aligned else 50.0)
+        if matched and preferred_terms:
+            if any(term.casefold() in haystack for term in preferred_terms):
+                goal = min(100.0, goal + (100 - goal) * 0.15 + 2)
+            else:
+                goal *= 0.98
         preferred = preferred_difficulty or (profile.get("difficulty_preference", "progressive"))
-        difficulty_value = tags.get("difficulty", "intermediate")
+        difficulty_value = self._book_difficulty(book, tags)
         difficulty = self._difficulty_score(preferred, difficulty_value)
         major = (
             80.0
@@ -574,7 +732,6 @@ class RecommendationService:
         )
         interests = profile.get("interests", [])
         interest = 85.0 if any(value.casefold() in haystack for value in interests) else 50.0
-        semantic = min(100.0, goal * 0.85 + (15.0 if topics else 0.0))
         availability = 100.0 if self._available_count(book) else 35.0 if book.holdings else 0.0
         active_weights = weights or {
             "goal": 0.30,
@@ -593,7 +750,17 @@ class RecommendationService:
             + availability * active_weights["availability"],
             2,
         )
+        if difficulty_value == "unknown" and active_weights["difficulty"] < 1:
+            # Unknown metadata contributes neither a bonus nor a fixed mismatch penalty.
+            other_weight = 1 - active_weights["difficulty"]
+            total = round((total - difficulty * active_weights["difficulty"]) / other_weight, 2)
         reason = self._template_reason(book, difficulty_value, topics, availability)
+        if matched and goal_terms:
+            evidence = next(
+                (term for term in goal_terms if term in (book.description or "").casefold()), None
+            )
+            if evidence:
+                reason = f"简介提到“{evidence}”，与你的学习目标相关。{reason}"
         related = EffectiveProfileService.relevant_abilities(profile, query)
         if related:
             labels = {
@@ -635,6 +802,7 @@ class RecommendationService:
                 "title": item.book.title,
                 "description": item.book.description,
                 "score": item.total,
+                "tags": [(tag.tag_type, tag.tag_value) for tag in item.book.tags],
                 "available_count": self._available_count(item.book),
             }
             for item in candidates
@@ -697,9 +865,7 @@ class RecommendationService:
     def _card(self, item: ScoredBook) -> RecommendationCard:
         book = item.book
         topics = [tag.tag_value for tag in book.tags if tag.tag_type == "topic"]
-        difficulty = next(
-            (tag.tag_value for tag in book.tags if tag.tag_type == "difficulty"), "intermediate"
-        )
+        difficulty = self._book_difficulty(book, {tag.tag_type: tag.tag_value for tag in book.tags})
         stage = next(
             (tag.tag_value for tag in book.tags if tag.tag_type == "learning_stage"), "核心"
         )
@@ -757,8 +923,23 @@ class RecommendationService:
             )
         )
 
+    @classmethod
+    def _subject_terms(cls, topic: str) -> list[str]:
+        cleaned = re.sub(r"推荐|我想|入门|进阶|零基础|图书|教材|只看可借|项目实践", " ", topic)
+        return cls._terms(cleaned)
+
+    @staticmethod
+    def _book_difficulty(book: Book, tags: dict) -> str:
+        if tags.get("difficulty"):
+            return tags["difficulty"]
+        if re.search(r"面向(?:初学者|零基础读者)|适合零基础|无需编程基础", book.description or ""):
+            return "beginner"
+        return "unknown"
+
     @staticmethod
     def _difficulty_score(preferred: str, actual: str) -> float:
+        if actual == "unknown":
+            return 60.0
         levels = {"beginner": 0, "progressive": 1, "intermediate": 1, "advanced": 2}
         return max(20.0, 100.0 - abs(levels.get(preferred, 1) - levels.get(actual, 1)) * 40.0)
 
@@ -775,10 +956,6 @@ class RecommendationService:
             return str(override)
         too_hard = sum(value.type == FeedbackType.TOO_HARD for value in feedback)
         too_easy = sum(value.type == FeedbackType.TOO_EASY for value in feedback)
-        if too_hard > too_easy:
-            return "beginner"
-        if too_easy > too_hard:
-            return "advanced"
         if profile is not None:
             if profile.get("sources", {}).get("difficulty_preference", {}).get("source") in {
                 "manual",
@@ -794,16 +971,23 @@ class RecommendationService:
                 rank = {"none": 0, "basic": 0, "intermediate": 1, "advanced": 2}
                 weakest = min(levels, key=lambda level: rank[level])
                 return {0: "beginner", 1: "intermediate", 2: "advanced"}[rank[weakest]]
-            return profile.get("difficulty_preference", "progressive")
+            baseline = profile.get("difficulty_preference", "progressive")
+            if abs(too_hard - too_easy) < 2:
+                return baseline
+            levels = ["beginner", "intermediate", "advanced"]
+            index = levels.index(baseline) if baseline in levels else 1
+            return levels[max(0, min(2, index + (1 if too_easy > too_hard else -1)))]
         return user.profile.difficulty_preference.value if user.profile else "progressive"
 
     @staticmethod
     def _template_reason(
         book: Book, difficulty: str, topics: list[str], availability: float
     ) -> str:
-        topic_text = "、".join(topics[:2]) or "当前学习目标"
-        availability_text = "目前有可借副本" if availability >= 100 else "馆藏信息完整，可到馆查阅"
-        return f"内容聚焦{topic_text}，难度为 {difficulty}；{availability_text}。"
+        topic_text = "、".join(topics[:2]) or book.title
+        availability_text = "目前有可借副本" if availability >= 100 else "暂无可借副本"
+        label = {"beginner": "入门", "intermediate": "中阶", "advanced": "进阶"}.get(difficulty)
+        level = f"难度为{label}" if label else "难度尚未确认"
+        return f"内容聚焦{topic_text}，{level}；{availability_text}。"
 
     def _profile_snapshot(self, user: User) -> dict:
         return EffectiveProfileService(self.session).build(user)

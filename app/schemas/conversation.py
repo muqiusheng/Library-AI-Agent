@@ -64,6 +64,7 @@ PREFERENCE_FIELDS: tuple[NeedField, ...] = (
 
 
 class LearningNeedState(BaseModel):
+    preferred_terms: list[str] = Field(default_factory=list, max_length=12)
     scenario: NeedScenario = "general"
     field_status: dict[NeedField, NeedStatus] = Field(default_factory=dict)
     topic: str | None = Field(default=None, max_length=4000)

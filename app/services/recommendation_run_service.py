@@ -205,6 +205,7 @@ class RecommendationRunService:
                     or None,
                 }
                 if stage == "comparing":
+                    arguments["resume_semantic_scores"] = checkpoint.get("semantic_scores", {})
                     arguments["resume_candidate_ids"] = [
                         UUID(value) for value in checkpoint["candidate_ids"]
                     ]
