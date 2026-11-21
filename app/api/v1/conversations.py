@@ -609,6 +609,7 @@ async def stream_message(
                 return
 
             effective_query = turns.query(context)
+            recommendation_options = {}
 
             # 首次或新主题推荐时澄清需求。
             # 已有书单的单纯换书操作不重新盘问用户。
@@ -645,9 +646,10 @@ async def stream_message(
                     )
 
                 if result.question:
-                    context.task.pending_question = (
-                        result.question
-                    )
+                    if result.action == "reply":
+                        context.task.pending_question = result.pending_question
+                    else:
+                        context.task.pending_question = result.question
 
                     if result.action == "cancel":
                         context.task = ConversationTask()
@@ -684,7 +686,10 @@ async def stream_message(
                     )
                     return
 
-                context.task.pending_question = ""
+                if result.guidance:
+                    recommendation_options["guidance"] = result.guidance
+                if result.requested_count:
+                    recommendation_options["requested_count"] = result.requested_count
 
                 # 需求状态与原任务合并。
                 # 明确切换主题时，使用新的主题，
@@ -790,6 +795,7 @@ async def stream_message(
             contexts.save(conversation, context)
 
             parameters = {
+                **recommendation_options,
                 "query": effective_query,
                 "only_available": (
                     context.constraints.only_available

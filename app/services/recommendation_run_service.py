@@ -171,6 +171,9 @@ class RecommendationRunService:
         yield "analysis", self.progress.snapshot()
         content = ""
         try:
+            if parameters.get("guidance"):
+                content = parameters["guidance"] + "\n\n"
+                yield "text_delta", {"content": content}
             recommendation = None
             if stage == "generating":
                 recommendation = cached_recommendation
@@ -190,7 +193,7 @@ class RecommendationRunService:
                         entry["available_count"] = by_id[entry["book_id"]].available_count
             else:
                 arguments = {
-                    **parameters,
+                    **{key: value for key, value in parameters.items() if key != "guidance"},
                     "user": self.user,
                     "conversation_id": self.conversation.id,
                     "current_message_id": self.user_message.id,

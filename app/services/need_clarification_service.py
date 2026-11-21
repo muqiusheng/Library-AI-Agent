@@ -3,7 +3,7 @@ import re
 from dataclasses import dataclass
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.orm import Session
 
 from app.db.models import Conversation, User
@@ -36,9 +36,12 @@ class NeedExtraction(BaseModel):
     cleared_fields: list[NeedField] = Field(default_factory=list)
     action: Literal[
         "continue",
+        "reply",
         "recommend",
         "cancel",
     ] = "continue"
+    guidance: str | None = Field(default=None, max_length=2000)
+    requested_count: int | None = Field(default=None, gt=0)
 
     new_topic: bool = False
 
@@ -66,13 +69,22 @@ class NeedExtraction(BaseModel):
         "theory", "practice", "balanced", "any"
     ] | None = None
 
+    @model_validator(mode="after")
+    def require_reply_text(self) -> "NeedExtraction":
+        if self.action == "reply" and not (self.guidance or "").strip():
+            raise ValueError("reply requires guidance answering the user's message")
+        return self
+
 
 @dataclass
 class ClarificationResult:
     question: str | None
     query: str
-    action: Literal["ask", "recommend", "cancel", "error"] = "recommend"
+    action: Literal["ask", "reply", "recommend", "cancel", "error"] = "recommend"
     new_topic: bool = False
+    guidance: str | None = None
+    requested_count: int | None = None
+    pending_question: str = ""
 
 
 QUESTIONS: dict[str, str] = {
@@ -216,6 +228,23 @@ class NeedClarificationService:
                 action="error",
             )
 
+        guidance = (extracted.guidance or "").strip()
+        if extracted.action == "reply":
+            state.pending_fields = [
+                name for name in state.pending_fields
+                if state.field_status.get(name, "unset") == "unset"
+            ]
+            self.constraints.save_learning_need(conversation, state)
+            return ClarificationResult(
+                question=guidance,
+                query=self._build_query(state),
+                action="reply",
+                new_topic=extracted.new_topic,
+                pending_question=(
+                    self._question(state, state.pending_fields) if state.pending_fields else ""
+                ),
+            )
+
         decision = self.policy.decide(
             state, direct=direct, refine=refine and not extracted.new_topic,
         )
@@ -228,6 +257,8 @@ class NeedClarificationService:
             if "topic" not in selected:
                 state.clarification_rounds += 1
             question = self._question(state, selected)
+            if guidance:
+                question = f"{guidance}\n\n{question}"
         else:
             state.pending_fields = []
 
@@ -241,6 +272,8 @@ class NeedClarificationService:
             query=self._build_query(state),
             action="ask" if question else "recommend",
             new_topic=extracted.new_topic,
+            guidance=guidance or None,
+            requested_count=extracted.requested_count,
         )
 
     @staticmethod
@@ -372,7 +405,7 @@ class NeedClarificationService:
 
         system_prompt = (
             "你负责提取图书推荐需求，"
-            "不负责生成问题，也不推荐图书。"
+            "同时处理选书澄清期间的学习咨询，不编造书目或馆藏。"
             "scenario 按用途选择 learning=学习入门、exam=课程考试、research=项目论文、"
             "interest=兴趣阅读、general=尚不明确；本轮未提供场景信息时返回 null。"
             "泛泛的“推荐几本书”不是有效 topic，缺少主题时返回 null。"
@@ -425,6 +458,17 @@ class NeedClarificationService:
             "明确取消本次选书为 cancel。"
             "用户主动询问是否可以直接推荐，"
             "不一定等于已经要求执行。"
+            "根据最近的助手问题、pending_fields 和已确认需求，先判断用户此刻想得到什么。"
+            "若追问先修知识、选项区别、请你代选学习路线、索要示例或暂缓荐书，"
+            "action=reply，guidance 用中文直接给出适合该主题与基础的解释、建议、实例或暂停确认。"
+            "例如问‘有什么需要先学习的知识吗’是在问先修内容；‘哪种适合我’的对象由上文决定。"
+            "只提及选项或你提出的建议不能写成用户偏好。纠正基础时保留仍有效的技能，"
+            "未答的字段留空。纠正或部分作答后若仍有未回答的上一问，"
+            "可用 reply 简短确认并承接尚待决定的选项。"
+            "有条件的选择先在 guidance 回应前提，条件确定成立才记录选择并继续；"
+            "前提不成立或不确定时用 reply 解释，不替用户选择。"
+            "明确要求先解释再荐书时 action=recommend，同时在 guidance 给出解释。"
+            "requested_count 只填写本轮明确请求的图书数量。普通选书回答的 guidance 返回 null。"
             "\n"
             "preferred_terms 保存最好包含的具体工具或术语，如 pandas。"
             "补充或撤销时返回仍有效的完整列表；清空为 []，没涉及为 null。"

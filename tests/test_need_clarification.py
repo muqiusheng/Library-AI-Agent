@@ -1,6 +1,7 @@
 from unittest.mock import AsyncMock
 
 import pytest
+from pydantic import ValidationError
 from sqlalchemy import select
 from test_conversation_memory import answer, recommendation, send
 from test_conversation_memory import memory_session as memory_session
@@ -23,6 +24,72 @@ def extraction_sequence(monkeypatch, *extractions):
 def need(fixture):
     session, _, conversation = fixture
     return ConversationConstraintService(session).get(conversation).learning_need
+
+
+def test_reply_requires_an_answer():
+    with pytest.raises(ValidationError, match="reply requires guidance"):
+        NeedExtraction(action="reply", guidance=" ")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("rounds,message,guidance", [
+    (1, "有什么需要先学习的知识吗", "可以从表、行、列开始。"),
+    (2, "有什么需要先学习的知识吗", "可以从表、行、列开始。"),
+    (2, "这两种路线差在哪", "一条先学概念，一条在案例里学概念。"),
+    (2, "哪种更适合我", "你偏好实践，可以从案例开始。"),
+    (2, "先别推书，给我看个例子", "比如一张借阅表，每一行记录一次借阅。"),
+])
+async def test_guidance_preserves_route_until_user_requests_books(
+    memory_session, monkeypatch, rounds, message, guidance,
+):
+    session, user, conversation = memory_session
+    ConversationConstraintService(session).save_learning_need(conversation, LearningNeedState(
+        topic="数据库", foundation="零基础", content_preference="practice",
+        pending_fields=["basics_preference"], clarification_rounds=rounds,
+    ))
+    extraction_sequence(monkeypatch, NeedExtraction(action="reply", guidance=guidance),
+                        NeedExtraction(action="recommend", requested_count=2))
+    events = await send(memory_session, message)
+    assert answer(events) == guidance
+    assert not any(kind == "recommendation_ready" for kind, _ in events)
+    state = need(memory_session)
+    assert state.pending_fields == ["basics_preference"]
+    assert state.basics_preference is None
+    assert state.clarification_rounds == rounds
+    task = ConversationContextService(session).build(conversation, user).task
+    assert "先补必要" in task.pending_question
+    result = recommendation(await send(memory_session, "那就推荐两本案例书"))
+    assert "数据库" in result["query"] and "零基础" in result["query"]
+    assert need(memory_session).content_preference == "practice"
+
+
+@pytest.mark.asyncio
+async def test_partial_answer_correction_and_conditional_choice(memory_session, monkeypatch):
+    session, _, conversation = memory_session
+    ConversationConstraintService(session).save_learning_need(conversation, LearningNeedState(
+        topic="Python", pending_fields=["content_preference", "foundation", "basics_preference"],
+        clarification_rounds=2,
+    ))
+    extraction_sequence(monkeypatch,
+        NeedExtraction(action="reply", guidance="已记下你偏好案例。",
+                       content_preference="practice"),
+        NeedExtraction(action="reply", guidance="两个方向都可以用案例入门。",
+                       foundation="会 Java，Python 零基础"),
+        NeedExtraction(action="recommend", basics_preference="skip", requested_count=2,
+                       guidance="可以直接做案例，无需先学其他语言。"),
+    )
+    await send(memory_session, "喜欢案例")
+    assert need(memory_session).foundation is None
+    assert need(memory_session).pending_fields == ["foundation", "basics_preference"]
+    await send(memory_session, "我会 Java，只是 Python 零基础，两种路线差在哪？")
+    assert need(memory_session).foundation == "会 Java，Python 零基础"
+    assert need(memory_session).topic == "Python"
+    events = await send(memory_session, "如果不用先学其他语言，就直接做案例。先解释，再推荐两本。")
+    kinds = [kind for kind, _ in events]
+    assert kinds.index("text_delta") < kinds.index("recommendation_ready")
+    assert answer(events).startswith("可以直接做案例")
+    assert len(recommendation(events)["items"]) == 2
+    assert need(memory_session).basics_preference == "skip"
 
 
 @pytest.mark.asyncio

@@ -163,6 +163,7 @@ class RecommendationService:
         constraints: dict | None = None,
         excluded_book_ids: list[UUID] | None = None,
         replacement_slots: list[UUID | None] | None = None,
+        requested_count: int | None = None,
         current_message_id: UUID | None = None,
         on_progress: Callable[[dict], Awaitable[None]] | None = None,
         excluded_profile_keys: list[str] | None = None,
@@ -191,6 +192,8 @@ class RecommendationService:
         constraint_values = {"only_available": only_available, **(constraints or {})}
         config = SystemConfigService(self.session)
         top_k = int(config.get("recommendation_top_k"))
+        if requested_count is not None:
+            top_k = min(top_k, requested_count)
         weights = config.get("recommendation_weights")
         only_available = bool(constraint_values.get("only_available"))
         excluded_ids = set(
