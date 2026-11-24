@@ -1,0 +1,47 @@
+{
+  "worker": "bookpath-instabox-keepalive",
+  "accountId": "a6ed6e1c599d60c239aeb1f8c5937fa7",
+  "version": "51c166cc-863b-4ede-a685-810bbc94a4cc",
+  "verifiedAt": "2026-11-24T08:51:52.605Z",
+  "cron": "*/10 * * * *",
+  "target": "https://8180-agrazil7kddepuxpn3avhjqu6q.instabox.tech/health",
+  "cloudflare": {
+    "/schedules": {
+      "schedules": [
+        {
+          "cron": "*/10 * * * *",
+          "created_on": "2026-11-24T08:51:11.365571Z",
+          "modified_on": "2026-11-24T08:51:11.365571Z"
+        }
+      ]
+    },
+    "/subdomain": {
+      "enabled": false,
+      "previews_enabled": false
+    },
+    "/settings": {
+      "observability": {
+        "enabled": true,
+        "head_sampling_rate": 1,
+        "redact_query_string": false,
+        "logs": {
+          "enabled": true,
+          "head_sampling_rate": 1,
+          "persist": true,
+          "invocation_logs": true
+        },
+        "traces": {
+          "enabled": false,
+          "persist": true,
+          "head_sampling_rate": 1
+        }
+      },
+      "bindings": [
+        {
+          "name": "TARGET_URL",
+          "type": "plain_text"
+        }
+      ]
+    }
+  }
+}

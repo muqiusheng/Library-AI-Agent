@@ -1,0 +1,13 @@
+{
+  "name": "bookpath-instabox-keepalive",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "check": "wrangler deploy --dry-run",
+    "dev": "wrangler dev --test-scheduled"
+  },
+  "devDependencies": {
+    "wrangler": "4.167.0"
+  }
+}

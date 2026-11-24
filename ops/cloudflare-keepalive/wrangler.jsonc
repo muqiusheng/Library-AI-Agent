@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "bookpath-instabox-keepalive",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-11-24",
+  "workers_dev": false,
+  "preview_urls": false,
+  "triggers": {
+    "crons": [
+      "*/10 * * * *"
+    ]
+  },
+  "vars": {
+    "TARGET_URL": "https://8180-agrazil7kddepuxpn3avhjqu6q.instabox.tech/health"
+  },
+  "observability": {
+    "enabled": true
+  },
+  "account_id": "a6ed6e1c599d60c239aeb1f8c5937fa7"
+}
