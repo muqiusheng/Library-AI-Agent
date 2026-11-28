@@ -1,0 +1,127 @@
+{
+  "schema_version": "1.0",
+  "operation": "register_test_accounts_and_record_profiles",
+  "endpoint": "http://127.0.0.1:8180",
+  "executed_at": "2026-11-28T14:01:20.373Z",
+  "recommendation_tests_run": false,
+  "credentials_saved": false,
+  "accounts": [
+    {
+      "student_no": "20241801",
+      "persona_id": "U1",
+      "label": "基础薄弱",
+      "registration_http_status": 201,
+      "registration_action": "created",
+      "user_id": "6455408d-ced2-40df-96fe-4a3ab77ae783",
+      "login_verified": true,
+      "profile_verified": true,
+      "course_count": 22,
+      "foundation_chars": 699,
+      "foundation_sha256": "0dfa2d61aafda50c6e41df989314eb99659b3b1604537d05b61aac440359c327",
+      "saved_difficulty_preference": "progressive",
+      "effective_difficulty_preference": "progressive",
+      "effective_difficulty_source": "registration",
+      "effective_abilities": {
+        "python": {
+          "topic": "Python",
+          "level": "basic",
+          "basis": "self_report"
+        },
+        "java": {
+          "topic": "Java",
+          "level": "basic",
+          "basis": "self_report"
+        },
+        "data_structures": {
+          "topic": "数据结构",
+          "level": "basic",
+          "basis": "self_report"
+        },
+        "database": {
+          "topic": "数据库",
+          "level": "basic",
+          "basis": "self_report"
+        }
+      },
+      "verified_at": "2026-11-28T14:01:20.585Z"
+    },
+    {
+      "student_no": "20241802",
+      "persona_id": "U2",
+      "label": "基础中等",
+      "registration_http_status": 201,
+      "registration_action": "created",
+      "user_id": "41316dac-62d4-4bde-9077-19e561c272cf",
+      "login_verified": true,
+      "profile_verified": true,
+      "course_count": 22,
+      "foundation_chars": 677,
+      "foundation_sha256": "e4e55172067bd1da42ae3ff65e11d0b6acb2eaf51dfe529742e4c0f8a2fa5814",
+      "saved_difficulty_preference": "progressive",
+      "effective_difficulty_preference": "progressive",
+      "effective_difficulty_source": "registration",
+      "effective_abilities": {
+        "python": {
+          "topic": "Python",
+          "level": "intermediate",
+          "basis": "self_report"
+        },
+        "java": {
+          "topic": "Java",
+          "level": "intermediate",
+          "basis": "self_report"
+        },
+        "data_structures": {
+          "topic": "数据结构",
+          "level": "intermediate",
+          "basis": "self_report"
+        },
+        "database": {
+          "topic": "数据库",
+          "level": "basic",
+          "basis": "self_report"
+        }
+      },
+      "verified_at": "2026-11-28T14:01:20.731Z"
+    },
+    {
+      "student_no": "20241803",
+      "persona_id": "U3",
+      "label": "基础扎实",
+      "registration_http_status": 201,
+      "registration_action": "created",
+      "user_id": "dc68601b-ce6a-43e9-afa4-42a58a32b5ed",
+      "login_verified": true,
+      "profile_verified": true,
+      "course_count": 22,
+      "foundation_chars": 687,
+      "foundation_sha256": "b09e8f1426f3f14409102bda11dee49fd99f71884a693c51898bbe568d8bff3e",
+      "saved_difficulty_preference": "progressive",
+      "effective_difficulty_preference": "progressive",
+      "effective_difficulty_source": "registration",
+      "effective_abilities": {
+        "python": {
+          "topic": "Python",
+          "level": "advanced",
+          "basis": "self_report"
+        },
+        "java": {
+          "topic": "Java",
+          "level": "advanced",
+          "basis": "self_report"
+        },
+        "data_structures": {
+          "topic": "数据结构",
+          "level": "advanced",
+          "basis": "self_report"
+        },
+        "database": {
+          "topic": "数据库",
+          "level": "basic",
+          "basis": "self_report"
+        }
+      },
+      "verified_at": "2026-11-28T14:01:20.886Z"
+    }
+  ]
+}

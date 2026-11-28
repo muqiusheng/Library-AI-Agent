@@ -12,12 +12,13 @@
     "note": "密码由用户另行提供，不写入画像或版本控制。"
   },
   "integration": {
-    "scope": "仅构建画像文件；未注册、登录或更新账号，未运行推荐。",
+    "scope": "2026-11-28已通过运行中的项目服务注册三个账号、录入画像，并完成登录与逐字段读取核验；未运行推荐。",
     "profile_payload": "可用于现有画像字段；注册时另外提供student_no、password及接口要求的其他字段。",
     "structured_records": "course_records是完整实验记录；现有接口没有结构化课程成绩字段，分数及能力信息同时投影至foundation。",
     "difficulty": "三人均不显式提交difficulty_preference；当前注册接口可能默认progressive。账号录入后需核对实际有效难度及来源，不能将默认值视为能力推断结果。",
     "causality": "本组同时改变成绩和具体能力证据，用于验证综合能力画像适配；不能单独证明成绩字段的因果作用。",
-    "preference_control": "三人不设置不同的理论/案例偏好或考试/项目/考研目标；不向系统提供evaluator_only。"
+    "preference_control": "三人不设置不同的理论/案例偏好或考试/项目/考研目标；不向系统提供evaluator_only。",
+    "registration_receipt": "output/profile-registration/registration-2026-11-28.json"
   },
   "personas": [
     {
