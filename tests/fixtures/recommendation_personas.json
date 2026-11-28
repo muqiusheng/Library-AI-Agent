@@ -1,0 +1,1044 @@
+{
+  "schema_version": "1.0",
+  "created_on": "2026-11-28",
+  "purpose": [
+    "相同需求下，比较不同能力用户的书目及难度适配",
+    "固定U2画像，比较不同内容偏好和使用目标下的推荐"
+  ],
+  "data_kind": "synthetic_personas",
+  "curriculum_source": "用户提供的两张培养计划截图；专业名称为据课程设置采用的测试背景，非已核验的官方专业名称。",
+  "credentials": {
+    "password_included": false,
+    "note": "密码由用户另行提供，不写入画像或版本控制。"
+  },
+  "integration": {
+    "scope": "仅构建画像文件；未注册、登录或更新账号，未运行推荐。",
+    "profile_payload": "可用于现有画像字段；注册时另外提供student_no、password及接口要求的其他字段。",
+    "structured_records": "course_records是完整实验记录；现有接口没有结构化课程成绩字段，分数及能力信息同时投影至foundation。",
+    "difficulty": "三人均不显式提交difficulty_preference；当前注册接口可能默认progressive。账号录入后需核对实际有效难度及来源，不能将默认值视为能力推断结果。",
+    "causality": "本组同时改变成绩和具体能力证据，用于验证综合能力画像适配；不能单独证明成绩字段的因果作用。",
+    "preference_control": "三人不设置不同的理论/案例偏好或考试/项目/考研目标；不向系统提供evaluator_only。"
+  },
+  "personas": [
+    {
+      "persona_id": "U1",
+      "student_no": "20241801",
+      "label": "基础薄弱",
+      "is_synthetic": true,
+      "background": {
+        "major": "数据科学与大数据技术",
+        "grade": "大三",
+        "semester": 6,
+        "stage_note": "合成测试统一模拟大三下、第6学期；不代表当前日期下的真实修读进度。",
+        "reading_conditions": {
+          "primary_language": "中文",
+          "english_reading": "可查阅英文术语，英文长篇阅读需要辅助",
+          "weekly_hours": 4
+        },
+        "long_term_goal": "巩固专业基础，提升理解原理与独立实现的能力",
+        "content_preference": "未设置；由每次测试需求明确",
+        "current_purpose": "未设置；考试、项目、考研作为后续测试变量",
+        "history_baseline": "后续使用独立测试账号与新会话，核对实际历史；本文件不假定账号已经创建或历史已经清空。"
+      },
+      "course_records": [
+        {
+          "course_code": "2800001",
+          "course_name": "高等数学A(1)",
+          "scheduled_semester": 1,
+          "module": "数学基础",
+          "credits": 6,
+          "status": "completed",
+          "score": 64,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2800002",
+          "course_name": "高等数学A(2)",
+          "scheduled_semester": 2,
+          "module": "数学基础",
+          "credits": 5,
+          "status": "completed",
+          "score": 61,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2800007",
+          "course_name": "线性代数B",
+          "scheduled_semester": 1,
+          "module": "数学基础",
+          "credits": 2,
+          "status": "completed",
+          "score": 63,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2505006",
+          "course_name": "离散数学",
+          "scheduled_semester": 2,
+          "module": "数学基础",
+          "credits": 3,
+          "status": "completed",
+          "score": 60,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2800214",
+          "course_name": "概率论与数理统计A",
+          "scheduled_semester": 3,
+          "module": "数学基础",
+          "credits": 4,
+          "status": "completed",
+          "score": 62,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2536002",
+          "course_name": "现代应用统计学",
+          "scheduled_semester": 4,
+          "module": "数学基础",
+          "credits": 2,
+          "status": "completed",
+          "score": 64,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2505072",
+          "course_name": "C语言程序设计",
+          "scheduled_semester": 1,
+          "module": "编程基础",
+          "credits": 4,
+          "status": "completed",
+          "score": 62,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2505190",
+          "course_name": "面向对象程序设计(JAVA)",
+          "scheduled_semester": 3,
+          "module": "编程基础",
+          "credits": 3,
+          "status": "completed",
+          "score": 64,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2536003",
+          "course_name": "面向数据科学的编程语言Python",
+          "scheduled_semester": 5,
+          "module": "编程基础",
+          "credits": 3,
+          "status": "completed",
+          "score": 65,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2505003",
+          "course_name": "数据结构",
+          "scheduled_semester": 4,
+          "module": "算法基础",
+          "credits": 5,
+          "status": "completed",
+          "score": 60,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2522030",
+          "course_name": "算法分析与设计",
+          "scheduled_semester": 6,
+          "module": "算法基础",
+          "credits": 3,
+          "status": "in_progress",
+          "score": null,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2505506",
+          "course_name": "计算机网络原理",
+          "scheduled_semester": 4,
+          "module": "系统与工程",
+          "credits": 3,
+          "status": "completed",
+          "score": 66,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2505013",
+          "course_name": "数据库原理",
+          "scheduled_semester": 5,
+          "module": "系统与工程",
+          "credits": 4,
+          "status": "completed",
+          "score": 65,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2505125",
+          "course_name": "操作系统原理",
+          "scheduled_semester": 5,
+          "module": "系统与工程",
+          "credits": 3,
+          "status": "completed",
+          "score": 63,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2505204",
+          "course_name": "软件工程",
+          "scheduled_semester": 5,
+          "module": "系统与工程",
+          "credits": 3,
+          "status": "completed",
+          "score": 67,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2536001",
+          "course_name": "数据科学导论",
+          "scheduled_semester": 3,
+          "module": "数据智能",
+          "credits": 3,
+          "status": "completed",
+          "score": 68,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2536008",
+          "course_name": "数据挖掘",
+          "scheduled_semester": 5,
+          "module": "数据智能",
+          "credits": 3,
+          "status": "completed",
+          "score": 62,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2536004",
+          "course_name": "机器学习",
+          "scheduled_semester": 6,
+          "module": "数据智能",
+          "credits": 3,
+          "status": "in_progress",
+          "score": null,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2525059",
+          "course_name": "高级语言程序设计课程设计",
+          "scheduled_semester": 3,
+          "module": "实践课程",
+          "credits": 2,
+          "status": "completed",
+          "score": 61,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2505309",
+          "course_name": "数据结构课程设计",
+          "scheduled_semester": 4,
+          "module": "实践课程",
+          "credits": 1,
+          "status": "completed",
+          "score": 60,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2505397",
+          "course_name": "数据库应用课程设计",
+          "scheduled_semester": 5,
+          "module": "实践课程",
+          "credits": 1,
+          "status": "completed",
+          "score": 64,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2536012",
+          "course_name": "数据挖掘课程设计",
+          "scheduled_semester": 5,
+          "module": "实践课程",
+          "credits": 1,
+          "status": "completed",
+          "score": 62,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        }
+      ],
+      "ability_evidence": {
+        "mathematics": "能完成直接套用公式的计算；条件概率、矩阵变换和抽象推理需要配合具体例子逐步解释。",
+        "programming": "学过C、JAVA和Python。能阅读变量、循环、函数组成的短程序；从零编写程序、分解任务和定位错误需要指导。",
+        "data_structures": "学过数据结构，但基础薄弱。能解释数组、链表的基本概念；独立实现链表插入删除有困难，树、图和复杂度分析尚不熟练。",
+        "systems": "学过网络、数据库、操作系统与软件工程。能辨认基本术语；多表查询、并发机制和系统设计需要示例辅助。",
+        "data_science": "数据科学导论、数据挖掘已修，机器学习在修。跟随步骤可以完成简单数据处理，难以独立解释建模流程与评估结果。",
+        "learning": "首次接触新概念时需要分步解释和多个示例；对原例改变输入或条件后，经常需要提示才能继续。"
+      },
+      "practice_evidence": [
+        {
+          "course_code": "2525059",
+          "course_name": "高级语言程序设计课程设计",
+          "score": 61,
+          "performance": "按教程和教师提示完成；代码组织与调试需要逐步帮助。",
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2505309",
+          "course_name": "数据结构课程设计",
+          "score": 60,
+          "performance": "参照示例完成链表和栈操作；改变需求后需要指导。",
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2505397",
+          "course_name": "数据库应用课程设计",
+          "score": 64,
+          "performance": "根据模板完成单表查询和基本增删改查，多表查询需要帮助。",
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2536012",
+          "course_name": "数据挖掘课程设计",
+          "score": 62,
+          "performance": "按给定步骤完成清洗和分类实验，尚不能独立解释模型与指标。",
+          "source": "synthetic_test_design"
+        }
+      ],
+      "profile_payload": {
+        "grade": "大三",
+        "major": "数据科学与大数据技术",
+        "foundation": "合成测试画像；统一模拟大三下。课程成绩（百分制）：高等数学A(1)：64分；高等数学A(2)：61分；线性代数B：63分；离散数学：60分；概率论与数理统计A：62分；现代应用统计学：64分；C语言程序设计：62分；面向对象程序设计(JAVA)：64分；面向数据科学的编程语言Python：65分；数据结构：60分；算法分析与设计：在修，暂无最终成绩；计算机网络原理：66分；数据库原理：65分；操作系统原理：63分；软件工程：67分；数据科学导论：68分；数据挖掘：62分；机器学习：在修，暂无最终成绩；高级语言程序设计课程设计：61分；数据结构课程设计：60分；数据库应用课程设计：64分；数据挖掘课程设计：62分。能力表现：数学理解：能完成直接套用公式的计算；条件概率、矩阵变换和抽象推理需要配合具体例子逐步解释。；编程能力：学过C、JAVA和Python。能阅读变量、循环、函数组成的短程序；从零编写程序、分解任务和定位错误需要指导。；数据结构表现：学过数据结构，但基础薄弱。能解释数组、链表的基本概念；独立实现链表插入删除有困难，树、图和复杂度分析尚不熟练。；系统基础：学过网络、数据库、操作系统与软件工程。能辨认基本术语；多表查询、并发机制和系统设计需要示例辅助。；数据智能：数据科学导论、数据挖掘已修，机器学习在修。跟随步骤可以完成简单数据处理，难以独立解释建模流程与评估结果。；学习表现：首次接触新概念时需要分步解释和多个示例；对原例改变输入或条件后，经常需要提示才能继续。。阅读条件：以中文为主，可查阅英文术语，每周学习4小时。理论或案例偏好、考试或项目或考研目的由本次需求指定。",
+        "learning_goals": [
+          "巩固专业基础，提升理解原理与独立实现的能力"
+        ],
+        "interests": [],
+        "courses": [
+          "高等数学A(1)",
+          "高等数学A(2)",
+          "线性代数B",
+          "离散数学",
+          "概率论与数理统计A",
+          "现代应用统计学",
+          "C语言程序设计",
+          "面向对象程序设计(JAVA)",
+          "面向数据科学的编程语言Python",
+          "数据结构",
+          "算法分析与设计",
+          "计算机网络原理",
+          "数据库原理",
+          "操作系统原理",
+          "软件工程",
+          "数据科学导论",
+          "数据挖掘",
+          "机器学习",
+          "高级语言程序设计课程设计",
+          "数据结构课程设计",
+          "数据库应用课程设计",
+          "数据挖掘课程设计"
+        ]
+      },
+      "evaluator_only": {
+        "expected_fit": "能支持基础概念理解、分步实现和必要先修补充；不能仅根据书名认定难度。",
+        "do_not_submit_as_profile": true
+      }
+    },
+    {
+      "persona_id": "U2",
+      "student_no": "20241802",
+      "label": "基础中等",
+      "is_synthetic": true,
+      "background": {
+        "major": "数据科学与大数据技术",
+        "grade": "大三",
+        "semester": 6,
+        "stage_note": "合成测试统一模拟大三下、第6学期；不代表当前日期下的真实修读进度。",
+        "reading_conditions": {
+          "primary_language": "中文",
+          "english_reading": "可查阅英文术语，英文长篇阅读需要辅助",
+          "weekly_hours": 4
+        },
+        "long_term_goal": "巩固专业基础，提升理解原理与独立实现的能力",
+        "content_preference": "未设置；由每次测试需求明确",
+        "current_purpose": "未设置；考试、项目、考研作为后续测试变量",
+        "history_baseline": "后续使用独立测试账号与新会话，核对实际历史；本文件不假定账号已经创建或历史已经清空。"
+      },
+      "course_records": [
+        {
+          "course_code": "2800001",
+          "course_name": "高等数学A(1)",
+          "scheduled_semester": 1,
+          "module": "数学基础",
+          "credits": 6,
+          "status": "completed",
+          "score": 78,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2800002",
+          "course_name": "高等数学A(2)",
+          "scheduled_semester": 2,
+          "module": "数学基础",
+          "credits": 5,
+          "status": "completed",
+          "score": 75,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2800007",
+          "course_name": "线性代数B",
+          "scheduled_semester": 1,
+          "module": "数学基础",
+          "credits": 2,
+          "status": "completed",
+          "score": 77,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2505006",
+          "course_name": "离散数学",
+          "scheduled_semester": 2,
+          "module": "数学基础",
+          "credits": 3,
+          "status": "completed",
+          "score": 74,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2800214",
+          "course_name": "概率论与数理统计A",
+          "scheduled_semester": 3,
+          "module": "数学基础",
+          "credits": 4,
+          "status": "completed",
+          "score": 79,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2536002",
+          "course_name": "现代应用统计学",
+          "scheduled_semester": 4,
+          "module": "数学基础",
+          "credits": 2,
+          "status": "completed",
+          "score": 76,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2505072",
+          "course_name": "C语言程序设计",
+          "scheduled_semester": 1,
+          "module": "编程基础",
+          "credits": 4,
+          "status": "completed",
+          "score": 76,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2505190",
+          "course_name": "面向对象程序设计(JAVA)",
+          "scheduled_semester": 3,
+          "module": "编程基础",
+          "credits": 3,
+          "status": "completed",
+          "score": 78,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2536003",
+          "course_name": "面向数据科学的编程语言Python",
+          "scheduled_semester": 5,
+          "module": "编程基础",
+          "credits": 3,
+          "status": "completed",
+          "score": 80,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2505003",
+          "course_name": "数据结构",
+          "scheduled_semester": 4,
+          "module": "算法基础",
+          "credits": 5,
+          "status": "completed",
+          "score": 77,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2522030",
+          "course_name": "算法分析与设计",
+          "scheduled_semester": 6,
+          "module": "算法基础",
+          "credits": 3,
+          "status": "in_progress",
+          "score": null,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2505506",
+          "course_name": "计算机网络原理",
+          "scheduled_semester": 4,
+          "module": "系统与工程",
+          "credits": 3,
+          "status": "completed",
+          "score": 75,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2505013",
+          "course_name": "数据库原理",
+          "scheduled_semester": 5,
+          "module": "系统与工程",
+          "credits": 4,
+          "status": "completed",
+          "score": 79,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2505125",
+          "course_name": "操作系统原理",
+          "scheduled_semester": 5,
+          "module": "系统与工程",
+          "credits": 3,
+          "status": "completed",
+          "score": 76,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2505204",
+          "course_name": "软件工程",
+          "scheduled_semester": 5,
+          "module": "系统与工程",
+          "credits": 3,
+          "status": "completed",
+          "score": 81,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2536001",
+          "course_name": "数据科学导论",
+          "scheduled_semester": 3,
+          "module": "数据智能",
+          "credits": 3,
+          "status": "completed",
+          "score": 80,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2536008",
+          "course_name": "数据挖掘",
+          "scheduled_semester": 5,
+          "module": "数据智能",
+          "credits": 3,
+          "status": "completed",
+          "score": 78,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2536004",
+          "course_name": "机器学习",
+          "scheduled_semester": 6,
+          "module": "数据智能",
+          "credits": 3,
+          "status": "in_progress",
+          "score": null,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2525059",
+          "course_name": "高级语言程序设计课程设计",
+          "scheduled_semester": 3,
+          "module": "实践课程",
+          "credits": 2,
+          "status": "completed",
+          "score": 77,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2505309",
+          "course_name": "数据结构课程设计",
+          "scheduled_semester": 4,
+          "module": "实践课程",
+          "credits": 1,
+          "status": "completed",
+          "score": 76,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2505397",
+          "course_name": "数据库应用课程设计",
+          "scheduled_semester": 5,
+          "module": "实践课程",
+          "credits": 1,
+          "status": "completed",
+          "score": 80,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2536012",
+          "course_name": "数据挖掘课程设计",
+          "scheduled_semester": 5,
+          "module": "实践课程",
+          "credits": 1,
+          "status": "completed",
+          "score": 78,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        }
+      ],
+      "ability_evidence": {
+        "mathematics": "能完成常规矩阵运算和概率计算；理解常见定义，但复杂推导和综合问题需要辅助解释。",
+        "programming": "熟悉C、JAVA和Python的常用语法，能独立完成常规程序；复杂模块组织与调试会参考文档和示例。",
+        "data_structures": "熟悉数据结构的常见知识，能独立实现链表、栈和队列；树、图以及复杂度综合分析需要参考示例。",
+        "systems": "理解网络、数据库与操作系统的常见概念，能写常规SQL；复杂查询优化、并发问题与系统设计仍需要帮助。",
+        "data_science": "数据科学导论、数据挖掘已修，机器学习在修。能独立完成常规清洗和可视化，模型选择及结果解释需要参考指导。",
+        "learning": "阅读解释并完成一个示例后，通常能处理同类任务；遇到跨知识点的新问题时需要提示。"
+      },
+      "practice_evidence": [
+        {
+          "course_code": "2525059",
+          "course_name": "高级语言程序设计课程设计",
+          "score": 77,
+          "performance": "独立完成常规功能，复杂错误通过文档和示例解决。",
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2505309",
+          "course_name": "数据结构课程设计",
+          "score": 76,
+          "performance": "独立实现线性结构；树和图任务参考示例后完成。",
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2505397",
+          "course_name": "数据库应用课程设计",
+          "score": 80,
+          "performance": "独立完成常规表设计和查询；复杂联表和优化需要提示。",
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2536012",
+          "course_name": "数据挖掘课程设计",
+          "score": 78,
+          "performance": "独立完成清洗、可视化和基线实验；模型比较需要指导。",
+          "source": "synthetic_test_design"
+        }
+      ],
+      "profile_payload": {
+        "grade": "大三",
+        "major": "数据科学与大数据技术",
+        "foundation": "合成测试画像；统一模拟大三下。课程成绩（百分制）：高等数学A(1)：78分；高等数学A(2)：75分；线性代数B：77分；离散数学：74分；概率论与数理统计A：79分；现代应用统计学：76分；C语言程序设计：76分；面向对象程序设计(JAVA)：78分；面向数据科学的编程语言Python：80分；数据结构：77分；算法分析与设计：在修，暂无最终成绩；计算机网络原理：75分；数据库原理：79分；操作系统原理：76分；软件工程：81分；数据科学导论：80分；数据挖掘：78分；机器学习：在修，暂无最终成绩；高级语言程序设计课程设计：77分；数据结构课程设计：76分；数据库应用课程设计：80分；数据挖掘课程设计：78分。能力表现：数学理解：能完成常规矩阵运算和概率计算；理解常见定义，但复杂推导和综合问题需要辅助解释。；编程能力：熟悉C、JAVA和Python的常用语法，能独立完成常规程序；复杂模块组织与调试会参考文档和示例。；数据结构表现：熟悉数据结构的常见知识，能独立实现链表、栈和队列；树、图以及复杂度综合分析需要参考示例。；系统基础：理解网络、数据库与操作系统的常见概念，能写常规SQL；复杂查询优化、并发问题与系统设计仍需要帮助。；数据智能：数据科学导论、数据挖掘已修，机器学习在修。能独立完成常规清洗和可视化，模型选择及结果解释需要参考指导。；学习表现：阅读解释并完成一个示例后，通常能处理同类任务；遇到跨知识点的新问题时需要提示。。阅读条件：以中文为主，可查阅英文术语，每周学习4小时。理论或案例偏好、考试或项目或考研目的由本次需求指定。",
+        "learning_goals": [
+          "巩固专业基础，提升理解原理与独立实现的能力"
+        ],
+        "interests": [],
+        "courses": [
+          "高等数学A(1)",
+          "高等数学A(2)",
+          "线性代数B",
+          "离散数学",
+          "概率论与数理统计A",
+          "现代应用统计学",
+          "C语言程序设计",
+          "面向对象程序设计(JAVA)",
+          "面向数据科学的编程语言Python",
+          "数据结构",
+          "算法分析与设计",
+          "计算机网络原理",
+          "数据库原理",
+          "操作系统原理",
+          "软件工程",
+          "数据科学导论",
+          "数据挖掘",
+          "机器学习",
+          "高级语言程序设计课程设计",
+          "数据结构课程设计",
+          "数据库应用课程设计",
+          "数据挖掘课程设计"
+        ]
+      },
+      "evaluator_only": {
+        "expected_fit": "能支持常见原理与独立实现，并提供适当的综合练习；不能仅根据书名认定难度。",
+        "do_not_submit_as_profile": true
+      }
+    },
+    {
+      "persona_id": "U3",
+      "student_no": "20241803",
+      "label": "基础扎实",
+      "is_synthetic": true,
+      "background": {
+        "major": "数据科学与大数据技术",
+        "grade": "大三",
+        "semester": 6,
+        "stage_note": "合成测试统一模拟大三下、第6学期；不代表当前日期下的真实修读进度。",
+        "reading_conditions": {
+          "primary_language": "中文",
+          "english_reading": "可查阅英文术语，英文长篇阅读需要辅助",
+          "weekly_hours": 4
+        },
+        "long_term_goal": "巩固专业基础，提升理解原理与独立实现的能力",
+        "content_preference": "未设置；由每次测试需求明确",
+        "current_purpose": "未设置；考试、项目、考研作为后续测试变量",
+        "history_baseline": "后续使用独立测试账号与新会话，核对实际历史；本文件不假定账号已经创建或历史已经清空。"
+      },
+      "course_records": [
+        {
+          "course_code": "2800001",
+          "course_name": "高等数学A(1)",
+          "scheduled_semester": 1,
+          "module": "数学基础",
+          "credits": 6,
+          "status": "completed",
+          "score": 94,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2800002",
+          "course_name": "高等数学A(2)",
+          "scheduled_semester": 2,
+          "module": "数学基础",
+          "credits": 5,
+          "status": "completed",
+          "score": 92,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2800007",
+          "course_name": "线性代数B",
+          "scheduled_semester": 1,
+          "module": "数学基础",
+          "credits": 2,
+          "status": "completed",
+          "score": 95,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2505006",
+          "course_name": "离散数学",
+          "scheduled_semester": 2,
+          "module": "数学基础",
+          "credits": 3,
+          "status": "completed",
+          "score": 93,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2800214",
+          "course_name": "概率论与数理统计A",
+          "scheduled_semester": 3,
+          "module": "数学基础",
+          "credits": 4,
+          "status": "completed",
+          "score": 94,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2536002",
+          "course_name": "现代应用统计学",
+          "scheduled_semester": 4,
+          "module": "数学基础",
+          "credits": 2,
+          "status": "completed",
+          "score": 92,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2505072",
+          "course_name": "C语言程序设计",
+          "scheduled_semester": 1,
+          "module": "编程基础",
+          "credits": 4,
+          "status": "completed",
+          "score": 93,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2505190",
+          "course_name": "面向对象程序设计(JAVA)",
+          "scheduled_semester": 3,
+          "module": "编程基础",
+          "credits": 3,
+          "status": "completed",
+          "score": 94,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2536003",
+          "course_name": "面向数据科学的编程语言Python",
+          "scheduled_semester": 5,
+          "module": "编程基础",
+          "credits": 3,
+          "status": "completed",
+          "score": 95,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2505003",
+          "course_name": "数据结构",
+          "scheduled_semester": 4,
+          "module": "算法基础",
+          "credits": 5,
+          "status": "completed",
+          "score": 94,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2522030",
+          "course_name": "算法分析与设计",
+          "scheduled_semester": 6,
+          "module": "算法基础",
+          "credits": 3,
+          "status": "in_progress",
+          "score": null,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2505506",
+          "course_name": "计算机网络原理",
+          "scheduled_semester": 4,
+          "module": "系统与工程",
+          "credits": 3,
+          "status": "completed",
+          "score": 91,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2505013",
+          "course_name": "数据库原理",
+          "scheduled_semester": 5,
+          "module": "系统与工程",
+          "credits": 4,
+          "status": "completed",
+          "score": 94,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2505125",
+          "course_name": "操作系统原理",
+          "scheduled_semester": 5,
+          "module": "系统与工程",
+          "credits": 3,
+          "status": "completed",
+          "score": 92,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2505204",
+          "course_name": "软件工程",
+          "scheduled_semester": 5,
+          "module": "系统与工程",
+          "credits": 3,
+          "status": "completed",
+          "score": 93,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2536001",
+          "course_name": "数据科学导论",
+          "scheduled_semester": 3,
+          "module": "数据智能",
+          "credits": 3,
+          "status": "completed",
+          "score": 94,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2536008",
+          "course_name": "数据挖掘",
+          "scheduled_semester": 5,
+          "module": "数据智能",
+          "credits": 3,
+          "status": "completed",
+          "score": 93,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2536004",
+          "course_name": "机器学习",
+          "scheduled_semester": 6,
+          "module": "数据智能",
+          "credits": 3,
+          "status": "in_progress",
+          "score": null,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2525059",
+          "course_name": "高级语言程序设计课程设计",
+          "scheduled_semester": 3,
+          "module": "实践课程",
+          "credits": 2,
+          "status": "completed",
+          "score": 94,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2505309",
+          "course_name": "数据结构课程设计",
+          "scheduled_semester": 4,
+          "module": "实践课程",
+          "credits": 1,
+          "status": "completed",
+          "score": 93,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2505397",
+          "course_name": "数据库应用课程设计",
+          "scheduled_semester": 5,
+          "module": "实践课程",
+          "credits": 1,
+          "status": "completed",
+          "score": 95,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2536012",
+          "course_name": "数据挖掘课程设计",
+          "scheduled_semester": 5,
+          "module": "实践课程",
+          "credits": 1,
+          "status": "completed",
+          "score": 94,
+          "score_scale": 100,
+          "source": "synthetic_test_design"
+        }
+      ],
+      "ability_evidence": {
+        "mathematics": "能熟练完成矩阵与概率计算，理解常见公式推导，能够说明假设并把数学知识用于分析问题。",
+        "programming": "熟练使用C、JAVA和Python，能独立拆分任务、编写模块、编写必要检查并定位常见错误。",
+        "data_structures": "熟练掌握数据结构，能独立实现常见结构与算法、分析复杂度，并按任务选择结构及解释取舍。",
+        "systems": "能结合网络、数据库与操作系统原理分析问题，完成查询优化和基本系统设计，并解释主要设计取舍。",
+        "data_science": "数据科学导论、数据挖掘已修，机器学习在修。能独立完成数据处理、基线建模和评估，说明数据泄漏与评估局限；机器学习课程仍在学习阶段。",
+        "learning": "阅读原理与示例后，能独立完成改变约束的任务，并说明思路；遇到新问题能够查文档和验证方案。"
+      },
+      "practice_evidence": [
+        {
+          "course_code": "2525059",
+          "course_name": "高级语言程序设计课程设计",
+          "score": 94,
+          "performance": "独立设计模块、实现功能并定位错误，能解释代码结构。",
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2505309",
+          "course_name": "数据结构课程设计",
+          "score": 93,
+          "performance": "独立实现结构与检索功能，比较复杂度并解释选型。",
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2505397",
+          "course_name": "数据库应用课程设计",
+          "score": 95,
+          "performance": "独立完成表设计、查询与索引比较，能解释主要取舍。",
+          "source": "synthetic_test_design"
+        },
+        {
+          "course_code": "2536012",
+          "course_name": "数据挖掘课程设计",
+          "score": 94,
+          "performance": "独立完成处理、基线建模和评估，能解释指标并检查数据泄漏。",
+          "source": "synthetic_test_design"
+        }
+      ],
+      "profile_payload": {
+        "grade": "大三",
+        "major": "数据科学与大数据技术",
+        "foundation": "合成测试画像；统一模拟大三下。课程成绩（百分制）：高等数学A(1)：94分；高等数学A(2)：92分；线性代数B：95分；离散数学：93分；概率论与数理统计A：94分；现代应用统计学：92分；C语言程序设计：93分；面向对象程序设计(JAVA)：94分；面向数据科学的编程语言Python：95分；数据结构：94分；算法分析与设计：在修，暂无最终成绩；计算机网络原理：91分；数据库原理：94分；操作系统原理：92分；软件工程：93分；数据科学导论：94分；数据挖掘：93分；机器学习：在修，暂无最终成绩；高级语言程序设计课程设计：94分；数据结构课程设计：93分；数据库应用课程设计：95分；数据挖掘课程设计：94分。能力表现：数学理解：能熟练完成矩阵与概率计算，理解常见公式推导，能够说明假设并把数学知识用于分析问题。；编程能力：熟练使用C、JAVA和Python，能独立拆分任务、编写模块、编写必要检查并定位常见错误。；数据结构表现：熟练掌握数据结构，能独立实现常见结构与算法、分析复杂度，并按任务选择结构及解释取舍。；系统基础：能结合网络、数据库与操作系统原理分析问题，完成查询优化和基本系统设计，并解释主要设计取舍。；数据智能：数据科学导论、数据挖掘已修，机器学习在修。能独立完成数据处理、基线建模和评估，说明数据泄漏与评估局限；机器学习课程仍在学习阶段。；学习表现：阅读原理与示例后，能独立完成改变约束的任务，并说明思路；遇到新问题能够查文档和验证方案。。阅读条件：以中文为主，可查阅英文术语，每周学习4小时。理论或案例偏好、考试或项目或考研目的由本次需求指定。",
+        "learning_goals": [
+          "巩固专业基础，提升理解原理与独立实现的能力"
+        ],
+        "interests": [],
+        "courses": [
+          "高等数学A(1)",
+          "高等数学A(2)",
+          "线性代数B",
+          "离散数学",
+          "概率论与数理统计A",
+          "现代应用统计学",
+          "C语言程序设计",
+          "面向对象程序设计(JAVA)",
+          "面向数据科学的编程语言Python",
+          "数据结构",
+          "算法分析与设计",
+          "计算机网络原理",
+          "数据库原理",
+          "操作系统原理",
+          "软件工程",
+          "数据科学导论",
+          "数据挖掘",
+          "机器学习",
+          "高级语言程序设计课程设计",
+          "数据结构课程设计",
+          "数据库应用课程设计",
+          "数据挖掘课程设计"
+        ]
+      },
+      "evaluator_only": {
+        "expected_fit": "在主题内提供更深入的分析、综合应用与设计取舍，同时尊重尚未完成的课程；不能仅根据书名认定难度。",
+        "do_not_submit_as_profile": true
+      }
+    }
+  ]
+}
