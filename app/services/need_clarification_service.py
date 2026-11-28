@@ -55,19 +55,15 @@ class NeedExtraction(BaseModel):
         max_length=1000,
     )
     learning_goal: str | None = Field(
-        default=None, max_length=2000,
+        default=None,
+        max_length=2000,
     )
-    basics_preference: Literal[
-        "first", "skip", "any"
-    ] | None = None
+    basics_preference: Literal["first", "skip", "any"] | None = None
 
-    language_preference: Literal[
-        "python", "non_python", "any", "not_applicable"
-    ] | None = None
+    language_preference: Literal["python", "non_python", "any", "not_applicable"] | None = None
 
-    content_preference: Literal[
-        "theory", "practice", "balanced", "any"
-    ] | None = None
+    content_preference: Literal["theory", "practice", "balanced", "any"] | None = None
+    orientation_required: bool | None = None
 
     @model_validator(mode="after")
     def require_reply_text(self) -> "NeedExtraction":
@@ -90,23 +86,11 @@ class ClarificationResult:
 QUESTIONS: dict[str, str] = {
     "topic": "你想找哪个主题的书？例如编程、考试参考书，或某类兴趣读物。",
     "learning_goal": "你主要想用这些书做什么？例如课程入门、准备考试、完成项目或论文。",
-    "foundation": (
-        "你目前有哪些相关基础？"
-        "例如学过哪些课程、会哪些工具，"
-        "也可以直接回答“零基础”。"
-    ),
-    "basics_preference": (
-        "你希望先补必要的基础知识，"
-        "还是直接进入这个主题？"
-    ),
-    "content_preference": (
-        "你更偏向理论原理，还是案例和项目实践？"
-        "也可以回答“两者兼顾”或“不限”。"
-    ),
+    "foundation": ("你目前有哪些相关基础？例如学过哪些课程、会哪些工具，也可以直接回答“零基础”。"),
+    "basics_preference": ("你希望先补必要的基础知识，还是直接进入这个主题？"),
+    "content_preference": ("你更偏向理论原理，还是案例和项目实践？也可以回答“两者兼顾”或“不限”。"),
     "language_preference": (
-        "你希望包含 Python 示例，"
-        "还是偏向不依赖 Python 的内容？"
-        "也可以回答“不限”。"
+        "你希望包含 Python 示例，还是偏向不依赖 Python 的内容？也可以回答“不限”。"
     ),
 }
 
@@ -138,17 +122,13 @@ class NeedClarificationService:
         self.provider = provider or DeepSeekProvider()
         self.policy = NeedPolicyService()
 
-        self.constraints = ConversationConstraintService(
-            session
-        )
+        self.constraints = ConversationConstraintService(session)
 
     def is_waiting(
         self,
         conversation: Conversation,
     ) -> bool:
-        state = self.constraints.get(
-            conversation
-        ).learning_need
+        state = self.constraints.get(conversation).learning_need
 
         return bool(state.pending_fields)
 
@@ -160,13 +140,9 @@ class NeedClarificationService:
         *,
         refine: bool = False,
     ) -> ClarificationResult:
-        state = self.constraints.get(
-            conversation
-        ).learning_need
+        state = self.constraints.get(conversation).learning_need
 
-        normalized = text.strip().rstrip(
-            "。！!？? "
-        )
+        normalized = text.strip().rstrip("。！!？? ")
 
         direct = normalized in DIRECT_REQUESTS
         if normalized in CANCEL_REQUESTS:
@@ -176,10 +152,7 @@ class NeedClarificationService:
             )
 
             return ClarificationResult(
-                question=(
-                    "好的，已取消本次选书。"
-                    "你可以随时告诉我新的学习目标。"
-                ),
+                question=("好的，已取消本次选书。你可以随时告诉我新的学习目标。"),
                 query="",
                 action="cancel",
             )
@@ -193,9 +166,7 @@ class NeedClarificationService:
                 extracted = await self._extract(conversation, user, state, text)
 
         if extracted is not None:
-            direct = direct or (
-                extracted.action == "recommend"
-            )
+            direct = direct or (extracted.action == "recommend")
 
             if extracted.action == "cancel":
                 self.constraints.save_learning_need(
@@ -231,7 +202,8 @@ class NeedClarificationService:
         guidance = (extracted.guidance or "").strip()
         if extracted.action == "reply":
             state.pending_fields = [
-                name for name in state.pending_fields
+                name
+                for name in state.pending_fields
                 if state.field_status.get(name, "unset") == "unset"
             ]
             self.constraints.save_learning_need(conversation, state)
@@ -246,7 +218,9 @@ class NeedClarificationService:
             )
 
         decision = self.policy.decide(
-            state, direct=direct, refine=refine and not extracted.new_topic,
+            state,
+            direct=direct,
+            refine=refine and not extracted.new_topic,
         )
         question = None
         if decision.action == "ask":
@@ -292,6 +266,8 @@ class NeedClarificationService:
 
     @staticmethod
     def _merge(state: LearningNeedState, extracted: NeedExtraction) -> LearningNeedState:
+        if extracted.orientation_required is not None:
+            state.orientation_required = extracted.orientation_required
         if extracted.preferred_terms is not None:
             state.preferred_terms = list(
                 dict.fromkeys(term.strip() for term in extracted.preferred_terms if term.strip())
@@ -323,6 +299,8 @@ class NeedClarificationService:
         elif extracted.learning_goal:
             state.scenario = "general"
         state.scenario = NeedPolicyService.scenario(state)
+        if state.content_preference in (None, "any"):
+            state.orientation_required = False
         return LearningNeedState.model_validate(state.model_dump())
 
     @staticmethod
@@ -337,8 +315,7 @@ class NeedClarificationService:
         questions["learning_goal"] = {
             "exam": "你正在学习什么课程，或准备哪项考试？也可以补充备考时间。",
             "research": (
-                "你的项目或论文要解决什么具体问题？"
-                "目前需要方法原理、参考研究还是实现案例？"
+                "你的项目或论文要解决什么具体问题？目前需要方法原理、参考研究还是实现案例？"
             ),
             "interest": "你更喜欢哪些主题或风格？也可以告诉我一本喜欢的作品。",
         }.get(state.scenario, QUESTIONS["learning_goal"])
@@ -389,9 +366,7 @@ class NeedClarificationService:
             }
 
         context = {
-            "current_state": state.model_dump(
-                mode="json"
-            ),
+            "current_state": state.model_dump(mode="json"),
             "profile_reference": profile,
             "history": [
                 {
@@ -448,6 +423,8 @@ class NeedClarificationService:
             "content_preference："
             "偏理论 theory，偏实践 practice，"
             "兼顾 balanced，不限 any。"
+            "仅当用户明确表示只要、必须或仅看某种内容取向时，orientation_required=true；"
+            "普通的更偏向、希望优先是软偏好，orientation_required=false。取消严格限制时也设false。"
             "\n"
             "用户说“都可以”时，"
             "仅把当前所问的偏好字段设为 any。"
@@ -524,14 +501,10 @@ class NeedClarificationService:
             lines.append("优先包含：" + "、".join(state.preferred_terms))
 
         if state.foundation:
-            lines.append(
-                f"已有基础：{state.foundation}"
-            )
+            lines.append(f"已有基础：{state.foundation}")
 
         if state.learning_goal:
-            lines.append(
-                f"具体学习目标：{state.learning_goal}"
-            )
+            lines.append(f"具体学习目标：{state.learning_goal}")
 
         labels = {
             "basics_preference": {

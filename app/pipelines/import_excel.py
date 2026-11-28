@@ -1,7 +1,7 @@
 import hashlib
 import sys
 from collections import Counter
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -12,6 +12,7 @@ from psycopg.types.json import Jsonb
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.content_orientation import ORIENTATION_LABELS, parse_orientation
 from app.db.models import (
     DataVersion,
     DataVersionStatus,
@@ -45,6 +46,7 @@ BOOK_COLUMNS = (
     "publisher",
     "publication_year",
     "description",
+    "content_orientation",
     "pages",
     "price",
     "volume_issue",
@@ -97,6 +99,7 @@ class ImportReport:
     isbn_invalid: int
     issues: int
     status_distribution: dict[str, int]
+    content_orientation_distribution: dict[str, int] = field(default_factory=dict)
 
 
 def file_sha256(path: Path) -> str:
@@ -148,7 +151,7 @@ class ExcelLibraryImporter:
                 **{
                     key: stats[key]
                     for key in ImportReport.__dataclass_fields__
-                    if key not in {"batch_id", "data_version_id", "duplicate_file"}
+                    if key not in {"batch_id", "data_version_id", "duplicate_file"} and key in stats
                 },
             )
 
@@ -205,6 +208,7 @@ class ExcelLibraryImporter:
         issue_rows: list[dict[str, Any]] = []
         isbn_counts = Counter(valid=0, missing=0, invalid=0)
         status_counts: Counter[str] = Counter()
+        orientation_conflicts: set[str] = set()
         raw_count = valid_count = skipped_count = 0
 
         for excel_row_no, values in enumerate(rows, start=2):
@@ -243,6 +247,19 @@ class ExcelLibraryImporter:
                 isbn_counts["missing"] += 1
 
             key = _aggregate_key(row, isbn10, isbn13)
+            try:
+                orientation = parse_orientation(row.get("内容取向"))
+            except ValueError:
+                orientation = None
+                self._issue(
+                    issue_rows,
+                    batch.id,
+                    excel_row_no,
+                    "内容取向",
+                    "invalid_value",
+                    row.get("内容取向"),
+                    "仅接受偏理论、理论实践结合、偏实践",
+                )
             book_id = book_rows.get(key, {}).get("id") or uuid4()
             publication_year = parse_year(row.get("出版年"))
             source_fingerprint = hashlib.sha256(f"{CLEANING_VERSION}|{key}".encode()).hexdigest()
@@ -259,6 +276,7 @@ class ExcelLibraryImporter:
                     "publisher": row.get("出版社"),
                     "publication_year": publication_year,
                     "description": row.get("简介"),
+                    "content_orientation": orientation,
                     "pages": parse_pages(row.get("页码")),
                     "price": parse_decimal(row.get("价格")),
                     "volume_issue": row.get("卷期"),
@@ -266,6 +284,22 @@ class ExcelLibraryImporter:
                     "created_at": datetime.now(UTC),
                     "updated_at": datetime.now(UTC),
                 }
+            elif key not in orientation_conflicts and orientation is not None:
+                previous = book_rows[key]["content_orientation"]
+                if previous is not None and previous != orientation:
+                    book_rows[key]["content_orientation"] = None
+                    orientation_conflicts.add(key)
+                    self._issue(
+                        issue_rows,
+                        batch.id,
+                        excel_row_no,
+                        "内容取向",
+                        "conflicting_value",
+                        row.get("内容取向"),
+                        "同一图书的馆藏副本内容取向不一致，暂不参与取向评分",
+                    )
+                else:
+                    book_rows[key]["content_orientation"] = orientation
             book_status = map_book_status(row.get("书刊状态"), row.get("流通状态"))
             circulation_status = map_circulation_status(row.get("书刊状态"), row.get("流通状态"))
             status_counts[book_status] += 1
@@ -316,6 +350,12 @@ class ExcelLibraryImporter:
             "isbn_invalid": isbn_counts["invalid"],
             "issues": len(issue_rows),
             "status_distribution": dict(status_counts),
+            "content_orientation_distribution": dict(
+                Counter(
+                    ORIENTATION_LABELS.get(book["content_orientation"], "未标注")
+                    for book in book_rows.values()
+                )
+            ),
         }
         batch.status = ImportStatus.SUCCEEDED
         batch.stage = "published" if publish else "ready_to_publish"

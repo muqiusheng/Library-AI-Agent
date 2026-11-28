@@ -905,12 +905,13 @@ const settingValues = reactive({
   ai_tag_batch_size: 50,
   reservation_expiry_days: 3,
   recommendation_weights: {
-    goal: 0.3,
-    difficulty: 0.2,
-    major: 0.15,
-    interest: 0.1,
-    semantic: 0.15,
-    availability: 0.1,
+    goal: 0.27,
+    difficulty: 0.18,
+    major: 0.135,
+    interest: 0.09,
+    semantic: 0.135,
+    availability: 0.09,
+    orientation: 0.1,
   },
 });
 const providerPresets = [
@@ -984,6 +985,7 @@ const weightLabels = {
   interest: "兴趣偏好",
   semantic: "语义相关",
   availability: "馆藏可用",
+  orientation: "内容取向匹配",
 };
 const currentLabel = computed(
   () => navigation.find((item) => item.id === section.value)?.label ?? "控制台",

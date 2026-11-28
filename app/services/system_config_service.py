@@ -5,6 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.content_orientation import recommendation_weights
 from app.core.errors import AppError
 from app.db.models import (
     Book,
@@ -36,15 +37,8 @@ _DEFAULTS: dict[str, tuple[Any, str]] = {
     "ai_tag_batch_size": (50, "管理员单次 AI 标签处理书目上限"),
     "reservation_expiry_days": (3, "模拟预约默认保留天数"),
     "recommendation_weights": (
-        {
-            "goal": 0.30,
-            "difficulty": 0.20,
-            "major": 0.15,
-            "interest": 0.10,
-            "semantic": 0.15,
-            "availability": 0.10,
-        },
-        "推荐六维评分权重，总和必须为 1",
+        recommendation_weights(),
+        "推荐七维评分权重，总和必须为 1；内容取向不限或未知时不参与加权",
     ),
 }
 
@@ -112,9 +106,7 @@ class SystemConfigService:
             else "环境变量 DEEPSEEK_API_KEY（密钥不会通过接口返回）",
         )
 
-    def update_ai_provider(
-        self, payload: AIProviderUpdate, admin_id: UUID
-    ) -> AIProviderStatus:
+    def update_ai_provider(self, payload: AIProviderUpdate, admin_id: UUID) -> AIProviderStatus:
         settings = get_settings()
         stored = self.session.get(SystemSetting, _AI_PROVIDER_KEY)
         previous = stored.value_json if stored and isinstance(stored.value_json, dict) else {}
@@ -183,7 +175,13 @@ class SystemConfigService:
         return [
             SystemSettingRead(
                 key=key,
-                value=stored[key].value_json if key in stored else default,
+                value=(
+                    recommendation_weights(stored[key].value_json if key in stored else default)
+                    if key == "recommendation_weights"
+                    else stored[key].value_json
+                    if key in stored
+                    else default
+                ),
                 description=description,
             )
             for key, (default, description) in _DEFAULTS.items()
@@ -195,7 +193,8 @@ class SystemConfigService:
                 status_code=400, code="SETTING_NOT_ALLOWED", message="配置项不在白名单中"
             )
         stored = self.session.get(SystemSetting, key)
-        return stored.value_json if stored else _DEFAULTS[key][0]
+        value = stored.value_json if stored else _DEFAULTS[key][0]
+        return recommendation_weights(value) if key == "recommendation_weights" else value
 
     def update_many(self, values: dict[str, Any], admin_id: UUID) -> list[SystemSettingRead]:
         unknown = set(values) - set(_DEFAULTS)
@@ -240,7 +239,10 @@ class SystemConfigService:
             return value
         if key == "recommendation_weights":
             allowed = {"goal", "difficulty", "major", "interest", "semantic", "availability"}
-            if not isinstance(value, dict) or set(value) != allowed:
+            if not isinstance(value, dict) or set(value) not in (
+                allowed,
+                allowed | {"orientation"},
+            ):
                 raise AppError(
                     status_code=422, code="SETTING_VALUE_INVALID", message="推荐权重字段不完整"
                 )
@@ -254,5 +256,5 @@ class SystemConfigService:
                     code="SETTING_VALUE_INVALID",
                     message="推荐权重必须在 0–1 且总和为 1",
                 )
-            return normalized
+            return recommendation_weights(normalized)
         return value

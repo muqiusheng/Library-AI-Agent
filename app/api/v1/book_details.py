@@ -33,6 +33,7 @@ def get_book_detail(
         "publisher": book.publisher,
         "publication_year": book.publication_year,
         "description": book.description,
+        "content_orientation": book.content_orientation,
         "pages": book.pages,
         "holdings": [
             {

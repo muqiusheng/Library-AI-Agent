@@ -1,6 +1,7 @@
 import { apiClient } from './client'
 import type { BookState } from './engagement'
 import type { HoldingCard } from '@/types/recommendation'
+import type { ContentOrientation } from '@/utils/contentOrientation'
 
 export interface BookStatus {
   book_id: string
@@ -24,6 +25,7 @@ export interface BookList {
   page_size: number
 }
 export interface CatalogDetail extends InterestBook {
+  content_orientation?: ContentOrientation | null
   publisher: string | null
   publication_year: number | null
   description: string | null

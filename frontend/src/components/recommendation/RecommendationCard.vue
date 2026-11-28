@@ -8,6 +8,7 @@
           <button class="min-h-10 shrink-0 rounded-full bg-amber/15 px-3 py-1.5 text-xs font-medium text-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-navy" :aria-expanded="showScore" @click="showScore = !showScore">初筛分项</button>
         </div>
         <div class="mt-3 flex flex-wrap gap-1.5"><span v-for="topic in book.topics.slice(0, 3)" :key="topic" class="rounded-full bg-sage/10 px-2.5 py-1 text-[11px] text-sage">{{ topic }}</span><span class="rounded-full bg-paper px-2.5 py-1 text-[11px] text-black/55">{{ difficultyLabel }}</span><span class="rounded-full bg-paper px-2.5 py-1 text-[11px] text-black/55">{{ book.learning_stage }}</span></div>
+        <p v-if="book.content_orientation" class="mt-2 text-xs text-black/50">内容取向 · {{ contentOrientationLabel(book.content_orientation) }}</p>
         <p class="mt-3 line-clamp-3 text-sm leading-6 text-black/60">{{ book.reason }}</p>
       </div>
     </div>
@@ -28,6 +29,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { contentOrientationLabel } from '@/utils/contentOrientation'
 import { sendFeedback, type FeedbackType } from '@/api/engagement'
 import type { RecommendationCardData } from '@/types/recommendation'
 import MatchBreakdown from './MatchBreakdown.vue'

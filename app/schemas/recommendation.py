@@ -3,6 +3,8 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
+from app.core.content_orientation import ContentOrientation
+
 
 class HoldingCard(BaseModel):
     id: UUID
@@ -21,6 +23,7 @@ class ScoreBreakdown(BaseModel):
     interest: float
     semantic: float
     availability: float
+    orientation: float | None = None
 
 
 class RecommendationCard(BaseModel):
@@ -31,6 +34,7 @@ class RecommendationCard(BaseModel):
     publisher: str | None
     publication_year: int | None
     description: str | None
+    content_orientation: ContentOrientation | None = None
     topics: list[str]
     difficulty: str
     learning_stage: str

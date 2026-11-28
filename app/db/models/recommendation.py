@@ -72,6 +72,7 @@ class RecommendationItem(Base):
     interest_score: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
     semantic_score: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
     availability_score: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
+    orientation_score: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
     reason: Mapped[str] = mapped_column(Text, nullable=False)
     reason_source: Mapped[str] = mapped_column(String(30), nullable=False)
 
@@ -99,9 +100,7 @@ class RecommendationFeedback(UUIDPrimaryKeyMixin, Base):
 
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     book_id: Mapped[UUID] = mapped_column(ForeignKey("books.id", ondelete="CASCADE"))
-    set_id: Mapped[UUID] = mapped_column(
-        ForeignKey("recommendation_sets.id", ondelete="CASCADE")
-    )
+    set_id: Mapped[UUID] = mapped_column(ForeignKey("recommendation_sets.id", ondelete="CASCADE"))
     type: Mapped[FeedbackType] = mapped_column(
         Enum(FeedbackType, values_callable=enum_values, native_enum=False, length=20),
         nullable=False,
@@ -144,9 +143,7 @@ class LearningPathStage(UUIDPrimaryKeyMixin, Base):
         UniqueConstraint("path_id", "position"),
     )
 
-    path_id: Mapped[UUID] = mapped_column(
-        ForeignKey("learning_paths.id", ondelete="CASCADE")
-    )
+    path_id: Mapped[UUID] = mapped_column(ForeignKey("learning_paths.id", ondelete="CASCADE"))
     position: Mapped[int] = mapped_column(Integer, nullable=False)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     objective: Mapped[str] = mapped_column(Text, nullable=False)

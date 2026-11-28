@@ -55,11 +55,17 @@ NeedField = Literal[
 NeedScenario = Literal["general", "learning", "exam", "research", "interest"]
 NeedStatus = Literal["unset", "confirmed", "any", "unknown", "skipped", "not_applicable"]
 NEED_FIELDS: tuple[NeedField, ...] = (
-    "topic", "learning_goal", "foundation", "basics_preference",
-    "language_preference", "content_preference",
+    "topic",
+    "learning_goal",
+    "foundation",
+    "basics_preference",
+    "language_preference",
+    "content_preference",
 )
 PREFERENCE_FIELDS: tuple[NeedField, ...] = (
-    "basics_preference", "language_preference", "content_preference",
+    "basics_preference",
+    "language_preference",
+    "content_preference",
 )
 
 
@@ -70,19 +76,15 @@ class LearningNeedState(BaseModel):
     topic: str | None = Field(default=None, max_length=4000)
     foundation: str | None = Field(default=None, max_length=1000)
     learning_goal: str | None = Field(
-        default=None, max_length=2000,
+        default=None,
+        max_length=2000,
     )
-    basics_preference: Literal[
-        "first", "skip", "any"
-    ] | None = None
+    basics_preference: Literal["first", "skip", "any"] | None = None
 
-    language_preference: Literal[
-        "python", "non_python", "any", "not_applicable"
-    ] | None = None
+    language_preference: Literal["python", "non_python", "any", "not_applicable"] | None = None
 
-    content_preference: Literal[
-        "theory", "practice", "balanced", "any"
-    ] | None = None
+    content_preference: Literal["theory", "practice", "balanced", "any"] | None = None
+    orientation_required: bool = False
 
     pending_fields: list[NeedField] = Field(default_factory=list)
     asked_fields: list[NeedField] = Field(default_factory=list)
@@ -128,9 +130,7 @@ class ConstraintRead(BaseModel):
     difficulty: str | None = None
     excluded_terms: list[str] = Field(default_factory=list)
 
-    learning_need: LearningNeedState = Field(
-        default_factory=LearningNeedState
-    )
+    learning_need: LearningNeedState = Field(default_factory=LearningNeedState)
 
 
 class MessageRead(BaseModel):
@@ -143,21 +143,16 @@ class MessageRead(BaseModel):
     structured_payload: dict[str, Any] | None
     created_at: datetime
 
+
 class RecommendationRetry(BaseModel):
-    stage: Literal[
-        "retrieving", "comparing", "generating"
-    ] = "retrieving"
-    excluded_profile_keys: list[str] | None = Field(
-        default=None, max_length=40
-    )
+    stage: Literal["retrieving", "comparing", "generating"] = "retrieving"
+    excluded_profile_keys: list[str] | None = Field(default=None, max_length=40)
     only_available: bool | None = None
 
 
 class ConversationTask(BaseModel):
     pending_relaxation: ConstraintUpdate | None = None
-    pending_profile_updates: list[dict[str, Any]] = Field(
-        default_factory=list
-    )
+    pending_profile_updates: list[dict[str, Any]] = Field(default_factory=list)
     pending_profile_request: str = ""
     topic: str = ""
     request: str = ""
@@ -187,6 +182,4 @@ class TurnResolution(BaseModel):
     keep_constraints: bool = False
     target_rank: int | None = Field(default=None, ge=1)
     clarification: str = ""
-    constraints: ConstraintUpdate = Field(
-        default_factory=ConstraintUpdate
-    )
+    constraints: ConstraintUpdate = Field(default_factory=ConstraintUpdate)

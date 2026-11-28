@@ -3,6 +3,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from app.core.content_orientation import ORIENTATION_LABELS
 from app.db.models import Book
 from app.integrations.embeddings.bge import BGEEmbeddingProvider
 from app.integrations.vector.chroma import ChromaVectorStore
@@ -37,6 +38,7 @@ class BookIndexService:
                 {
                     "data_version": str(data_version_id),
                     "title": book.title[:300],
+                    "content_orientation": book.content_orientation or "unknown",
                     **(
                         {"publication_year": book.publication_year} if book.publication_year else {}
                     ),
@@ -63,6 +65,7 @@ class BookIndexService:
                 f"责任者：{book.responsible_person or ''}",
                 f"出版社与年份：{book.publisher or ''} {book.publication_year or ''}",
                 f"简介：{book.description or ''}",
+                f"内容取向：{ORIENTATION_LABELS.get(book.content_orientation, '未标注')}",
                 f"主题：{'、'.join(grouped.get('topic', []))}",
                 f"难度与阶段：{'、'.join(difficulty_stage)}",
                 f"内容风格：{'、'.join(grouped.get('content_style', []))}",

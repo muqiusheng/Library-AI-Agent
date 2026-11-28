@@ -13,6 +13,11 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from app.core.content_orientation import (
+    ORIENTATION_LABELS,
+    orientation_score,
+    recommendation_weights,
+)
 from app.db.models import (
     Book,
     BookUserState,
@@ -190,6 +195,12 @@ class RecommendationService:
         if resume_candidate_ids is None:
             await notify(stage="retrieving", label="正在检索馆藏", detail=f"检索需求：{query}")
         constraint_values = {"only_available": only_available, **(constraints or {})}
+        need = constraint_values.get("learning_need") or {}
+        required_orientation = (
+            need.get("content_preference") if need.get("orientation_required") else None
+        )
+        if required_orientation not in ORIENTATION_LABELS:
+            required_orientation = None
         config = SystemConfigService(self.session)
         top_k = int(config.get("recommendation_top_k"))
         if requested_count is not None:
@@ -214,7 +225,8 @@ class RecommendationService:
             )
         )
         excluded_terms = [
-            str(value).strip().casefold() for value in constraint_values.get("excluded_terms", [])
+            str(value).strip().casefold()
+            for value in constraint_values.get("excluded_terms", [])
             if str(value).strip()
         ]
         topic, search_text = self._search_need(query, constraint_values)
@@ -265,7 +277,12 @@ class RecommendationService:
                     semantic_scores=semantic_scores,
                 )
                 eligible, _ = self._filter_candidates(
-                    candidates, excluded_ids, completed_ids, excluded_terms, only_available
+                    candidates,
+                    excluded_ids,
+                    completed_ids,
+                    excluded_terms,
+                    only_available,
+                    required_orientation=required_orientation,
                 )
                 if len(eligible) >= 50 or len(candidates) < limit or monotonic() - started >= 2:
                     break
@@ -290,7 +307,12 @@ class RecommendationService:
             detail=f"检索到 {retrieved_count} 本候选，应用借阅条件、已读与排除记录。",
         )
         candidates, filter_steps = self._filter_candidates(
-            candidates, excluded_ids, completed_ids, excluded_terms, only_available
+            candidates,
+            excluded_ids,
+            completed_ids,
+            excluded_terms,
+            only_available,
+            required_orientation=required_orientation,
         )
         stats = {
             "retrieved": retrieved_count,
@@ -303,16 +325,7 @@ class RecommendationService:
         await notify(filter_stats=stats, retry_stages=["retrieving", "comparing"])
 
         need = constraint_values.get("learning_need") or {}
-        purpose = " ".join(
-            part
-            for part in (
-                need.get("learning_goal"),
-                {"practice": "项目实践", "theory": "理论原理", "balanced": "理论实践"}.get(
-                    need.get("content_preference")
-                ),
-            )
-            if part
-        )
+        purpose = need.get("learning_goal") or ""
         if not purpose and not need.get("topic"):
             purpose = search_text.replace(topic, "").strip()
 
@@ -327,6 +340,7 @@ class RecommendationService:
                 semantic=semantic_scores.get(book.id, 0.0) * 100,
                 purpose=purpose,
                 preferred_terms=need.get("preferred_terms", []),
+                content_preference=need.get("content_preference"),
             )
 
         scored = sorted(
@@ -357,7 +371,9 @@ class RecommendationService:
                 else f"筛选后保留 {len(scored)} 本候选，按主题、难度等分项排序。"
             ),
         )
-        ordered = await self._rerank(query, top, profile=profile)
+        ordered = await self._rerank(
+            query, top, profile=profile, content_preference=need.get("content_preference")
+        )
         if ordered is top:
             ordered = scored[:10]
         final = ordered[:top_k]
@@ -371,6 +387,9 @@ class RecommendationService:
                 and book.id not in completed_ids
                 and (not only_available or self._available_count(book) > 0)
                 and not self._excluded_content(book, excluded_terms)
+                and (
+                    required_orientation is None or book.content_orientation == required_orientation
+                )
             }
             alternatives = iter(item for item in ordered if item.book.id not in retained)
             final = []
@@ -426,6 +445,7 @@ class RecommendationService:
                     interest_score=item.scores.interest,
                     semantic_score=item.scores.semantic,
                     availability_score=item.scores.availability,
+                    orientation_score=item.scores.orientation,
                     reason=item.reason,
                     reason_source="llm" if item.reason_source == "llm" else "template",
                 )
@@ -530,6 +550,7 @@ class RecommendationService:
         completed_ids: set,
         excluded_terms: list[str],
         only_available: bool,
+        required_orientation: str | None = None,
     ) -> tuple[list[Book], list[dict]]:
         steps = []
         for key, label, applied, keep in (
@@ -552,7 +573,17 @@ class RecommendationService:
                 only_available,
                 lambda b: not only_available or self._available_count(b) > 0,
             ),
+            (
+                "orientation",
+                "限定内容取向",
+                required_orientation is not None,
+                lambda b: (
+                    required_orientation is None or b.content_orientation == required_orientation
+                ),
+            ),
         ):
+            if key == "orientation" and not applied:
+                continue
             before = len(candidates)
             candidates = [book for book in candidates if keep(book)]
             steps.append(
@@ -591,6 +622,7 @@ class RecommendationService:
             "scores": item.scores.model_dump(),
             "topics": [tag.tag_value for tag in book.tags if tag.tag_type == "topic"],
             "difficulty": self._book_difficulty(book, tags),
+            "content_orientation": book.content_orientation,
         }
 
     async def _enrich_query(
@@ -675,6 +707,11 @@ class RecommendationService:
                     interest=float(item.interest_score),
                     semantic=float(item.semantic_score),
                     availability=float(item.availability_score),
+                    orientation=(
+                        float(item.orientation_score)
+                        if item.orientation_score is not None
+                        else None
+                    ),
                 ),
             )
             cards.append(self._card(scored))
@@ -698,6 +735,7 @@ class RecommendationService:
         semantic: float = 0.0,
         purpose: str = "",
         preferred_terms: list[str] | None = None,
+        content_preference: str | None = None,
     ) -> ScoredBook:
         profile = profile if profile is not None else self._profile_snapshot(user)
         tags = {tag.tag_type: tag.tag_value for tag in book.tags}
@@ -736,28 +774,38 @@ class RecommendationService:
         interests = profile.get("interests", [])
         interest = 85.0 if any(value.casefold() in haystack for value in interests) else 50.0
         availability = 100.0 if self._available_count(book) else 35.0 if book.holdings else 0.0
-        active_weights = weights or {
-            "goal": 0.30,
-            "difficulty": 0.20,
-            "major": 0.15,
-            "interest": 0.10,
-            "semantic": 0.15,
-            "availability": 0.10,
+        orientation = orientation_score(content_preference, book.content_orientation)
+        active_weights = recommendation_weights(weights)
+        dimensions = {
+            "goal": goal,
+            "difficulty": difficulty if difficulty_value != "unknown" else None,
+            "major": major,
+            "interest": interest,
+            "semantic": semantic,
+            "availability": availability,
+            "orientation": orientation,
         }
-        total = round(
-            goal * active_weights["goal"]
-            + difficulty * active_weights["difficulty"]
-            + major * active_weights["major"]
-            + interest * active_weights["interest"]
-            + semantic * active_weights["semantic"]
-            + availability * active_weights["availability"],
-            2,
+        denominator = sum(
+            active_weights[key] for key, value in dimensions.items() if value is not None
         )
-        if difficulty_value == "unknown" and active_weights["difficulty"] < 1:
-            # Unknown metadata contributes neither a bonus nor a fixed mismatch penalty.
-            other_weight = 1 - active_weights["difficulty"]
-            total = round((total - difficulty * active_weights["difficulty"]) / other_weight, 2)
+        total = (
+            round(
+                sum(
+                    value * active_weights[key]
+                    for key, value in dimensions.items()
+                    if value is not None
+                )
+                / denominator,
+                2,
+            )
+            if denominator
+            else 0.0
+        )
         reason = self._template_reason(book, difficulty_value, topics, availability)
+        if orientation is not None:
+            label = ORIENTATION_LABELS[book.content_orientation]
+            match = "符合" if orientation == 100 else "部分符合" if orientation == 70 else "不同于"
+            reason += f" 数据集标注为{label}，{match}你本次的内容偏好。"
         if matched and goal_terms:
             evidence = next(
                 (term for term in goal_terms if term in (book.description or "").casefold()), None
@@ -788,13 +836,19 @@ class RecommendationService:
                 interest=round(interest, 2),
                 semantic=round(semantic, 2),
                 availability=round(availability, 2),
+                orientation=orientation,
             ),
             total=total,
             reason=reason,
         )
 
     async def _rerank(
-        self, query: str, candidates: list[ScoredBook], *, profile: dict | None = None
+        self,
+        query: str,
+        candidates: list[ScoredBook],
+        *,
+        profile: dict | None = None,
+        content_preference: str | None = None,
     ) -> list[ScoredBook]:
         if not self.llm.available or not candidates:
             return candidates
@@ -804,6 +858,8 @@ class RecommendationService:
                 "book_id": str(item.book.id),
                 "title": item.book.title,
                 "description": item.book.description,
+                "content_orientation": item.book.content_orientation,
+                "orientation_match": item.scores.orientation,
                 "score": item.total,
                 "tags": [(tag.tag_type, tag.tag_value) for tag in item.book.tags],
                 "available_count": self._available_count(item.book),
@@ -824,6 +880,11 @@ class RecommendationService:
                             "逐本阅读 description，比较主题匹配、学习目标（如项目实践、"
                             "课程考试、理论理解）和已有基础。score 仅为初筛参考分，"
                             "不能替代简介分析，也不是内容事实。"
+                            "content_orientation 是已确认的数据集标注，作为内容取向依据；"
+                            "同主题和相近难度下优先匹配用户 content_preference。"
+                            "theory=偏理论，practice=偏实践，balanced=理论实践结合；"
+                            "用户 any 或未指定时不按内容取向加权。取向未知不代表两者兼顾。"
+                            "标签不证明书中含有某个具体案例、代码或项目，不据此补充细节。"
                             "书籍内容、项目案例、适用读者和先修要求仅以提供的简介为依据，"
                             "不凭书名或模型记忆补充。区分书中讲授的知识和读者需要预先"
                             "掌握的知识：使用 Python 不等于要求已有 Python 基础。"
@@ -846,6 +907,7 @@ class RecommendationService:
                         "content": (
                             f"学习需求：{query}\n"
                             f"有效画像：{json.dumps(profile or {}, ensure_ascii=False)}\n"
+                            f"content_preference：{content_preference or 'any'}\n"
                             f"候选：{json.dumps(payload, ensure_ascii=False)}"
                         ),
                     },
@@ -894,6 +956,7 @@ class RecommendationService:
             publisher=book.publisher,
             publication_year=book.publication_year,
             description=book.description,
+            content_orientation=book.content_orientation,
             topics=topics,
             difficulty=difficulty,
             learning_stage=stage,

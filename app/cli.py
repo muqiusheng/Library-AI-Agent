@@ -8,6 +8,7 @@ from sqlalchemy import desc, select
 
 from app.db.models import DataVersion, DataVersionStatus
 from app.db.session import SessionLocal
+from app.pipelines.content_orientation import backfill_content_orientation
 from app.pipelines.import_excel import ExcelLibraryImporter, report_as_dict
 from app.pipelines.index import BookIndexService
 from app.pipelines.tag import RuleTaggingService
@@ -46,6 +47,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--version", type=UUID, help="data version UUID; defaults to latest published"
     )
     index_parser.add_argument("--limit", type=int)
+    orientation_parser = subparsers.add_parser(
+        "backfill-content-orientation", help="restore dataset orientation from stored holdings"
+    )
+    orientation_parser.add_argument("--version", type=UUID)
+    orientation_parser.add_argument("--reindex", action="store_true")
     demo_parser = subparsers.add_parser("seed-demo", help="create two idempotent demo students")
     demo_parser.add_argument("--password-env", default="BOOKPATH_DEMO_PASSWORD")
     subparsers.add_parser(
@@ -100,6 +106,14 @@ def main() -> int:
         print(
             json.dumps({"data_version_id": str(version_id), "processed": count}, ensure_ascii=False)
         )
+        return 0
+    if args.command == "backfill-content-orientation":
+        with SessionLocal() as session:
+            version_id = resolve_data_version(session, args.version)
+            report = backfill_content_orientation(session, version_id)
+            if args.reindex:
+                report["indexed"] = BookIndexService(session).build(version_id)
+        print(json.dumps(report, ensure_ascii=False))
         return 0
     if args.command == "seed-demo":
         password = os.getenv(args.password_env)

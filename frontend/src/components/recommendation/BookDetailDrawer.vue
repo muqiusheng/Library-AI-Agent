@@ -10,6 +10,7 @@
         <p class="mt-4 rounded-xl bg-sage/10 px-4 py-3 text-sm text-sage">请前往一楼大厅自助借书机办理借阅。</p>
         <p v-if="error" role="alert" class="mt-3 text-sm text-red-700">{{ error }}</p>
         <div class="mt-6 grid grid-cols-2 gap-3 rounded-2xl bg-paper p-4 text-sm"><div><p class="text-xs text-black/40">ISBN</p><p class="mt-1 font-medium">{{ detail.isbn || '未提供' }}</p></div><div><p class="text-xs text-black/40">出版社 / 年份</p><p class="mt-1 font-medium">{{ detail.publisher || '未提供' }} {{ detail.publication_year || '' }}</p></div></div>
+        <p class="mt-3 text-sm text-black/55">内容取向 <span class="ml-2 inline-block rounded-full bg-paper px-3 py-1 text-xs text-navy">{{ contentOrientationLabel(detail.content_orientation) }}</span></p>
         <p v-if="detail.description" class="mt-6 text-sm leading-7 text-black/60">{{ detail.description }}</p>
         <MatchBreakdown class="mt-6" v-if="book?.scores && book.total_score !== undefined" :scores="book.scores" :total="book.total_score" />
         <section class="mt-7"><h3 class="font-semibold text-navy">馆藏副本（{{ detail.holdings_count }}）</h3><p class="mt-2 rounded-xl bg-amber/10 px-3 py-2 text-xs leading-5 text-amber-800">预约为演示模拟操作，尚未同步学校图书馆系统，不能代替真实占座或借阅。</p><div class="mt-3 space-y-3"><article v-for="holding in detail.holdings" :key="holding.id" class="rounded-2xl border border-black/8 p-4 text-sm"><div class="flex items-center justify-between gap-2"><strong class="text-navy">{{ holding.collection_location || '馆藏地未注明' }}</strong><span class="rounded-full px-2 py-1 text-xs" :class="holding.book_status === 'available' ? 'bg-sage/10 text-sage' : 'bg-amber/15 text-amber-700'">{{ holding.book_status === 'available' ? '在馆' : holding.book_status }}</span></div><dl class="mt-3 grid grid-cols-2 gap-3 text-xs"><div><dt class="text-black/40">所在地</dt><dd class="mt-1">{{ holding.current_location || '—' }}</dd></div><div><dt class="text-black/40">排架号</dt><dd class="mt-1">{{ holding.shelf_number || '—' }}</dd></div><div class="col-span-2"><dt class="text-black/40">索书号</dt><dd class="mt-1 font-medium">{{ holding.call_number || '—' }}</dd></div></dl><div v-if="holding.book_status === 'available' && holding.circulation_status === 'lendable'" class="mt-3 flex items-center justify-between border-t border-black/5 pt-3"><span class="text-xs text-sage">{{ reservationNotice[holding.id] }}</span><button class="jelly-hover rounded-xl bg-navy px-3 py-2 text-xs font-semibold text-white disabled:opacity-50" :disabled="reserving === holding.id || Boolean(reservationNotice[holding.id])" @click="reserve(holding.id)">{{ reserving === holding.id ? '预约中…' : reservationNotice[holding.id] ? '已模拟预约' : '模拟预约' }}</button></div></article></div></section>
@@ -21,6 +22,7 @@
 
 <script setup lang="ts">
 import { nextTick, reactive, ref, watch } from 'vue'
+import { contentOrientationLabel } from '@/utils/contentOrientation'
 import { createReservation } from '@/api/notifications'
 import { getCatalogDetail, type CatalogDetail } from '@/api/readingInterest'
 import { useReadingInterestStore } from '@/stores/readingInterest'

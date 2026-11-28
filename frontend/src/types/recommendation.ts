@@ -1,3 +1,5 @@
+import type { ContentOrientation } from '@/utils/contentOrientation'
+
 export interface HoldingCard {
   id: string
   call_number: string | null
@@ -15,6 +17,7 @@ export interface ScoreBreakdown {
   interest: number
   semantic: number
   availability: number
+  orientation?: number | null
 }
 
 export interface RecommendationCardData {
@@ -25,6 +28,7 @@ export interface RecommendationCardData {
   publisher: string | null
   publication_year: number | null
   description: string | null
+  content_orientation?: ContentOrientation | null
   topics: string[]
   difficulty: string
   learning_stage: string

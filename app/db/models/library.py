@@ -4,6 +4,7 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy import (
+    CheckConstraint,
     Date,
     DateTime,
     Enum,
@@ -40,6 +41,10 @@ class DataVersion(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 class Book(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __tablename__ = "books"
     __table_args__ = (
+        CheckConstraint(
+            "content_orientation IN ('theory', 'balanced', 'practice')",
+            name="content_orientation_values",
+        ),
         Index("ix_books_data_version_isbn13", "data_version_id", "isbn13"),
         Index("ix_books_data_version_title", "data_version_id", "normalized_title"),
         Index("ix_books_publication_year", "publication_year"),
@@ -58,6 +63,7 @@ class Book(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     publisher: Mapped[str | None] = mapped_column(String(255))
     publication_year: Mapped[int | None] = mapped_column(Integer)
     description: Mapped[str | None] = mapped_column(Text)
+    content_orientation: Mapped[str | None] = mapped_column(String(16))
     pages: Mapped[int | None] = mapped_column(Integer)
     price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     volume_issue: Mapped[str | None] = mapped_column(String(100))
@@ -117,8 +123,6 @@ class BookTag(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         default=ReviewStatus.PENDING,
         nullable=False,
     )
-    reviewer_id: Mapped[UUID | None] = mapped_column(
-        ForeignKey("users.id", ondelete="SET NULL")
-    )
+    reviewer_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
 
     book: Mapped[Book] = relationship(back_populates="tags")
